@@ -2,7 +2,6 @@ import StockDeductionSheet from '../components/recipe/StockDeductionSheet'
 import { useRef, useState } from 'react'
 import { ArrowRight, Bookmark, Check, Minus, Plus, Sprout } from 'lucide-react'
 import EditProfileHeader from '../components/profile/EditProfileHeader'
-import FloatingAssistant from '../components/common/FloatingAssistant'
 import { recipes } from '../data/recipes'
 import character from '../assets/hankkiloop-character.png'
 
@@ -54,7 +53,6 @@ export default function RecipeDetail({ recipeId, savedIds, onToggleSave, onBack,
         {recipe.tip && <aside ref={tipRef} tabIndex={-1} className="mt-8 flex gap-3 rounded-2xl border border-[#cee3ff] bg-[#eff6ff] p-4 shadow-xs outline-none"><img src={character} alt="" className="size-14 shrink-0 rounded-2xl object-cover" /><div><h2 className="flex flex-wrap items-center gap-2 text-sm font-bold">레시피 팁 <span className="rounded-full bg-[#3982f6] px-2 py-1 text-[10px] text-white">AI BOT</span></h2><p className="mt-1.5 text-sm leading-6 text-[#4b5563]">{recipe.tip}</p></div></aside>}
         {completed && <p role="status" className="mt-2 text-center text-xs text-[#64748b]">선택한 재료의 재고 차감을 완료했어요.</p>}
       </main>
-      <FloatingAssistant onClick={() => { tipRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); tipRef.current?.focus({ preventScroll: true }) }} />
       <footer className="shrink-0 border-t border-[#e5e7eb] bg-white px-4 pt-4 pb-[calc(16px+env(safe-area-inset-bottom))]">
         <button type="button" disabled={completed} onClick={handleCompleteCooking} className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#1b4535] text-base font-bold text-white shadow-lg disabled:bg-[#527466]"><Check aria-hidden="true" className="size-6 text-[#6ee7b7]" />{completed ? '요리 완료했어요' : '요리 완료 (재고 차감)'}</button>
 

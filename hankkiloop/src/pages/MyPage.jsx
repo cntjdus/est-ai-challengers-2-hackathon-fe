@@ -8,10 +8,12 @@ import AvoidIngredientsSection from '../components/preferenceSetup/AvoidIngredie
 import SmartCareCard from '../components/mypage/SmartCareCard'
 import BottomNavigation from '../components/common/BottomNavigation'
 
-export default function MyPage({ account = defaultGoogleAccount, nickname = '자취새싹이', initialPreferences, onEditProfile, initialAlerts, onNavigate }) {
+export default function MyPage({ account = defaultGoogleAccount, nickname = '자취새싹이', initialPreferences, onEditProfile, initialAlerts, onNavigate, onDraftChange }) {
   const { preferences, dietaryProps, avoidProps } = usePreferences(initialPreferences)
   const [expirationAlert, setExpirationAlert] = useState(initialAlerts?.expirationAlert ?? true)
   const [recipeSuggestionAlert, setRecipeSuggestionAlert] = useState(initialAlerts?.recipeSuggestionAlert ?? true)
+  const { householdType, cookingFrequency, dietStyles, excludedIngredients } = preferences
+  useEffect(() => { onDraftChange?.({ preferences: { householdType, cookingFrequency, dietStyles, excludedIngredients }, alerts: { expirationAlert, recipeSuggestionAlert } }) }, [householdType, cookingFrequency, dietStyles, excludedIngredients, expirationAlert, recipeSuggestionAlert, onDraftChange])
   const pageRef = useRef(null)
   useEffect(() => { pageRef.current.focus() }, [])
 
@@ -26,7 +28,7 @@ export default function MyPage({ account = defaultGoogleAccount, nickname = '자
   return (
     <div ref={pageRef} tabIndex={-1} className="mx-auto flex h-dvh w-full max-w-app flex-col overflow-hidden bg-[#f8f9ff] outline-none">
       <MyPageHeader onSettings={handleEditProfile} />
-      <main aria-label="마이페이지 설정" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-3 pb-8">
+      <main aria-label="마이페이지 설정" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-3 pb-20">
         <div className="flex flex-col gap-3.5">
           <ProfileCard account={account} nickname={nickname} preferences={preferences} onEdit={handleEditProfile} />
           <DietaryPreferencesSection {...dietaryProps} />

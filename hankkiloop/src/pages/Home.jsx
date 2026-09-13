@@ -17,7 +17,7 @@ export default function Home({ onNavigate }) {
   return (
     <div ref={pageRef} tabIndex={-1} className="mx-auto flex h-dvh w-full max-w-app flex-col overflow-hidden bg-[#fafcf9] outline-none">
       <HomeHeader onProfile={() => onNavigate('/mypage')} />
-      <main aria-label="홈" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-[18px] pb-12">
+      <main aria-label="홈" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-[18px] pb-20">
         <section className="flex items-center gap-3.5 rounded-3xl border border-[#e5ece7] bg-white p-3.5 shadow-[0_2px_8px_rgba(27,77,62,0.05)]">
           <div className="relative size-14 shrink-0 overflow-hidden rounded-2xl border border-[#bbf7d0] bg-[#d1fae5]"><img src={character} alt="한끼루프 냉장고 캐릭터" className="absolute top-[-12%] left-[-2%] w-[255%] max-w-none" /></div>
           <div><span className="rounded-full border border-[#a7f3d0]/70 bg-[#ecfdf5] px-2 py-1 text-[11px] text-[#047857]">식재료 낭비 방지 14일째</span><p className="mt-1 text-[13px] leading-[18px] text-[#1e293b]">안녕하세요! 이번 주 식재료를 함께<br className="max-[359px]:hidden" /> 알뜰하게 관리해볼까요? <Sprout aria-hidden="true" className="ml-1 inline size-3 text-[#65a30d]" /></p></div>
