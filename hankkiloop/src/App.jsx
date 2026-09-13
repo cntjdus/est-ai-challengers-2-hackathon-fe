@@ -1,3 +1,6 @@
+import { createMockInventory, deductInventory } from './data/inventory'
+import RecipeDetail from './pages/RecipeDetail'
+import Recipe from './pages/Recipe'
 import Home from './pages/Home'
 import EditProfilePage from './pages/EditProfilePage'
 import MyPage from './pages/MyPage'
@@ -9,7 +12,12 @@ import AccountConsentPage from './pages/AccountConsentPage'
 import { defaultGoogleAccount } from './data/googleAccount'
 
 export default function App() {
-  const [screen, setScreen] = useState(() => ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : 'login')
+  const [screen, setScreen] = useState(() => location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : 'login')
+  const [inventory, setInventory] = useState(createMockInventory)
+  const handleStockDeduction = (selected) => setInventory(deductInventory(inventory, selected))
+  const [savedIds, setSavedIds] = useState([])
+  const [recipeListState, setRecipeListState] = useState({})
+  const toggleRecipeSave = (id) => setSavedIds((previous) => previous.includes(id) ? previous.filter((item) => item !== id) : [...previous, id])
   const [account, setAccount] = useState(() => history.state?.account ?? defaultGoogleAccount)
   const [nickname, setNickname] = useState(() => history.state?.nickname ?? '자취새싹이')
   const [preferences, setPreferences] = useState(() => history.state?.preferences)
@@ -47,7 +55,7 @@ export default function App() {
       if (history.state?.nickname !== undefined) setNickname(history.state.nickname)
       setPreferences(history.state?.preferences)
       setAlerts(history.state?.alerts)
-      setScreen(['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : (history.state?.screen ?? 'login'))
+      setScreen(location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : (history.state?.screen ?? 'login'))
     }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
@@ -72,15 +80,18 @@ export default function App() {
   }
 
   const handleMainNavigate = (path, currentProfile = { account, nickname, preferences, alerts }) => {
-    if (!['/', '/home', '/mypage'].includes(path) || path === location.pathname) return
+    if ((!['/', '/home', '/mypage', '/recipe', '/recipes'].includes(path) && !/^\/recipe\/[^/]+$/.test(path)) || path === location.pathname) return
     setAccount(currentProfile.account)
     setNickname(currentProfile.nickname)
     setPreferences(currentProfile.preferences)
     setAlerts(currentProfile.alerts)
     history.replaceState(currentProfile, '', location.href)
-    history.pushState(currentProfile, '', path)
-    setScreen(path === '/mypage' ? 'mypage' : 'home')
+    history.pushState({ ...currentProfile, fromRecipe: ['/recipe', '/recipes'].includes(location.pathname) }, '', path)
+    setScreen(path.startsWith('/recipe/') ? 'recipeDetail' : path === '/mypage' ? 'mypage' : ['/recipe', '/recipes'].includes(path) ? 'recipe' : 'home')
   }
+
+  if (screen === 'recipeDetail') return <RecipeDetail inventory={inventory} onDeductStock={handleStockDeduction} key={location.pathname} recipeId={location.pathname.slice('/recipe/'.length)} savedIds={savedIds} onToggleSave={toggleRecipeSave} onBack={() => { if (history.state?.fromRecipe) history.back(); else handleMainNavigate('/recipe') }} />
+  if (screen === 'recipe') return <Recipe onNavigate={handleMainNavigate} savedIds={savedIds} onToggleSave={toggleRecipeSave} listState={recipeListState} onListStateChange={setRecipeListState} />
 
   if (screen === 'home') return <Home onNavigate={handleMainNavigate} />
 
