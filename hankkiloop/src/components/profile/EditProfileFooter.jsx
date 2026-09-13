@@ -1,0 +1,4 @@
+import check from '../../assets/icons/account-check.svg'
+export default function EditProfileFooter({ onCancel, onSave, disabled }) {
+  return <footer className="z-10 shrink-0 border-t border-[#e2e8f0]/80 bg-white/95 px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.04)] backdrop-blur-[6px]"><div className="grid grid-cols-[1fr_2fr] gap-1"><button type="button" onClick={onCancel} className="h-10 rounded-xl bg-[#f1f5f9] text-xs font-semibold text-[#334155]">취소</button><button type="button" onClick={onSave} disabled={disabled} className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#047857] text-xs font-bold text-white shadow-xs disabled:cursor-not-allowed disabled:opacity-40"><img src={check} alt="" className="h-[7.5px] w-[10.5px]" />수정 완료</button></div></footer>
+}
