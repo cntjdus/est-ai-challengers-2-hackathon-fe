@@ -1,0 +1,4 @@
+import { Check, Minus } from 'lucide-react'
+export default function Checkbox({ checked, onChange, label, disabled = false, mixed = false }) {
+  return <label className="relative flex size-6 shrink-0 items-center justify-center"><input type="checkbox" aria-label={label} checked={checked} disabled={disabled} ref={(element) => { if (element) element.indeterminate = mixed }} onChange={onChange} className="peer absolute inset-0 size-full cursor-pointer appearance-none rounded-md border border-[#d1d5db] bg-white checked:border-[#009b73] checked:bg-[#009b73] indeterminate:bg-[#009b73] focus-visible:outline-2 focus-visible:outline-[#006c49] disabled:cursor-default" />{(checked || mixed) && (mixed ? <Minus aria-hidden="true" className="pointer-events-none relative size-4 text-white" /> : <Check aria-hidden="true" className="pointer-events-none relative size-4 stroke-3 text-white" />)}</label>
+}

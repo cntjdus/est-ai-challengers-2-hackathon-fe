@@ -1,3 +1,9 @@
+import PackageSolution from './pages/PackageSolution'
+import { getPackageOptions, replaceCartItem } from './data/packageOptions'
+import MaterialRegister from './pages/MaterialRegister'
+import { registerMaterials } from './data/materialRegistration'
+import Cart from './pages/Cart'
+import { initialCartItems } from './data/cart'
 import AIChat from './pages/AIChat'
 import FloatingAssistant from './components/common/FloatingAssistant'
 import { createMockInventory, deductInventory } from './data/inventory'
@@ -14,10 +20,13 @@ import AccountConsentPage from './pages/AccountConsentPage'
 import { defaultGoogleAccount } from './data/googleAccount'
 
 export default function App() {
-  const [screen, setScreen] = useState(() => location.pathname === '/ai-chat' ? 'aiChat' : location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : 'login')
+  const [screen, setScreen] = useState(() => location.pathname === '/shopping/package-solution' ? 'packageSolution' : location.pathname === '/shopping/register' ? 'register' : location.pathname === '/shopping' ? 'shopping' : location.pathname === '/ai-chat' ? 'aiChat' : location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : 'login')
+  const [cartItems, setCartItems] = useState(() => history.state?.cartItems ?? initialCartItems)
+  const [registeredMaterials, setRegisteredMaterials] = useState(() => history.state?.registeredMaterials ?? [])
+  const [shoppingFooterHeight, setShoppingFooterHeight] = useState(0)
   const [chatMessages, setChatMessages] = useState([])
 
-  const [inventory, setInventory] = useState(createMockInventory)
+  const [inventory, setInventory] = useState(() => registerMaterials(createMockInventory(), history.state?.registeredMaterials ?? []))
   const handleStockDeduction = (selected) => setInventory(deductInventory(inventory, selected))
   const [savedIds, setSavedIds] = useState([])
   const [recipeListState, setRecipeListState] = useState({})
@@ -60,7 +69,7 @@ export default function App() {
       if (history.state?.nickname !== undefined) setNickname(history.state.nickname)
       setPreferences(history.state?.preferences)
       setAlerts(history.state?.alerts)
-      setScreen(location.pathname === '/ai-chat' ? 'aiChat' : location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : (history.state?.screen ?? 'login'))
+      setScreen(location.pathname === '/shopping/package-solution' ? 'packageSolution' : location.pathname === '/shopping/register' ? 'register' : location.pathname === '/shopping' ? 'shopping' : location.pathname === '/ai-chat' ? 'aiChat' : location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : (history.state?.screen ?? 'login'))
     }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
@@ -85,25 +94,64 @@ export default function App() {
   }
 
   const handleMainNavigate = (path, currentProfile = { account, nickname, preferences, alerts }) => {
-    if ((!['/', '/home', '/mypage', '/recipe', '/recipes', '/ai-chat'].includes(path) && !/^\/recipe\/[^/]+$/.test(path)) || path === location.pathname) return
+    if ((!['/', '/home', '/mypage', '/recipe', '/recipes', '/ai-chat', '/shopping'].includes(path) && !/^\/recipe\/[^/]+$/.test(path)) || path === location.pathname) return
     setAccount(currentProfile.account)
     setNickname(currentProfile.nickname)
     setPreferences(currentProfile.preferences)
     setAlerts(currentProfile.alerts)
-    history.replaceState(currentProfile, '', location.href)
-    history.pushState({ ...currentProfile, fromRecipe: ['/recipe', '/recipes', '/ai-chat'].includes(location.pathname) }, '', path)
-    setScreen(path === '/ai-chat' ? 'aiChat' : path.startsWith('/recipe/') ? 'recipeDetail' : path === '/mypage' ? 'mypage' : ['/recipe', '/recipes'].includes(path) ? 'recipe' : 'home')
+    history.replaceState({ ...history.state, ...currentProfile, cartItems, registeredMaterials }, '', location.href)
+    history.pushState({ ...currentProfile, cartItems, registeredMaterials, fromApp: true, fromRecipe: ['/recipe', '/recipes', '/ai-chat'].includes(location.pathname) }, '', path)
+    setScreen(path === '/shopping' ? 'shopping' : path === '/ai-chat' ? 'aiChat' : path.startsWith('/recipe/') ? 'recipeDetail' : path === '/mypage' ? 'mypage' : ['/recipe', '/recipes'].includes(path) ? 'recipe' : 'home')
   }
 
+  const handleStartRegistration = (selectedItems) => {
+    if (!selectedItems.length) return
+    const profile = { account, nickname, preferences, alerts, cartItems, registeredMaterials }
+    history.replaceState({ ...history.state, ...profile }, '', location.href)
+    history.pushState({ ...profile, fromShopping: true, registrationId: crypto.randomUUID(), registrationItems: selectedItems }, '', '/shopping/register')
+    setScreen('register')
+  }
+  const handleRegisterToFridge = (materials) => {
+    if (!materials.length || materials.some((item) => !cartItems.some((cart) => cart.id === item.id))) throw new Error('장바구니에서 등록할 재료를 다시 선택해주세요.')
+    const nextInventory = registerMaterials(inventory, materials)
+    const registered = [...registeredMaterials, ...materials.map((item) => ({ ...item, ingredientName: item.ingredientName.trim(), registeredAt: new Date().toISOString() }))]
+    const remaining = cartItems.filter((item) => !materials.some((material) => material.id === item.id))
+    setInventory(nextInventory)
+    setRegisteredMaterials(registered)
+    setCartItems(remaining)
+    // 냉장고 Main 화면이 아직 없으므로 등록 성공 후 장바구니로 돌아갑니다.
+    history.replaceState({ account, nickname, preferences, alerts, cartItems: remaining, registeredMaterials: registered, registrationMessage: materials.length + '개 재료를 냉장고에 등록했어요.' }, '', '/shopping')
+    setScreen('shopping')
+  }
+  const handleOpenPackageSolution = (item) => {
+    if (!item) return
+    const profile = { account, nickname, preferences, alerts, cartItems, registeredMaterials }
+    history.replaceState({ ...history.state, ...profile }, '', location.href)
+    history.pushState({ ...profile, fromShopping: true, packageItemId: item.id, solutionId: crypto.randomUUID() }, '', '/shopping/package-solution')
+    setScreen('packageSolution')
+  }
+  const handleReplaceCartItem = (itemId, selectedProduct) => {
+    const original = cartItems.find((item) => item.id === itemId)
+    const product = original && getPackageOptions(original).find((option) => option.id === selectedProduct.id)
+    if (!original || !product) throw new Error('장바구니 상품을 다시 확인해주세요.')
+    const replacement = replaceCartItem(original, product)
+    const nextCart = cartItems.map((item) => item.id === itemId ? replacement : item)
+    setCartItems(nextCart)
+    history.replaceState({ account, nickname, preferences, alerts, cartItems: nextCart, registeredMaterials, registrationMessage: '선택한 소포장 상품으로 교체했어요.' }, '', '/shopping')
+    setScreen('shopping')
+  }
+  if (screen === 'packageSolution') return <PackageSolution key={history.state?.solutionId ?? 'empty'} item={cartItems.find((item) => item.id === history.state?.packageItemId)} onBack={() => { if (history.state?.fromShopping) history.back(); else handleMainNavigate('/shopping') }} onClose={() => handleMainNavigate('/shopping')} onReplace={handleReplaceCartItem} />
+  if (screen === 'register') return <MaterialRegister key={history.state?.registrationId ?? 'empty'} items={history.state?.registrationItems ?? []} onNavigate={handleMainNavigate} onBack={() => { if (history.state?.fromShopping) history.back(); else handleMainNavigate('/shopping') }} onRegister={handleRegisterToFridge} />
   if (screen === 'recipeDetail') return <RecipeDetail inventory={inventory} onDeductStock={handleStockDeduction} key={location.pathname} recipeId={location.pathname.slice('/recipe/'.length)} savedIds={savedIds} onToggleSave={toggleRecipeSave} onBack={() => { if (history.state?.fromRecipe) history.back(); else handleMainNavigate('/recipe') }} />
   if (screen === 'aiChat') return <AIChat onNavigate={handleMainNavigate} messages={chatMessages} onMessagesChange={setChatMessages} />
   // Main navigation 화면에서만 AI 버튼을 한 번 렌더링합니다.
-  const showMainAssistant = ['/', '/home', '/recipe', '/recipes', '/mypage'].includes(location.pathname) && ['home', 'recipe', 'mypage'].includes(screen)
+  const showMainAssistant = ['/', '/home', '/recipe', '/recipes', '/mypage', '/shopping'].includes(location.pathname) && ['home', 'recipe', 'mypage', 'shopping'].includes(screen)
   if (showMainAssistant) return (
-    <div className="relative mx-auto h-dvh w-full max-w-app">
+    <div style={{ "--assistant-extra-bottom": screen === "shopping" ? shoppingFooterHeight + "px" : "0px" }} className="relative mx-auto h-dvh w-full max-w-app">
       {screen === 'home' && <Home onNavigate={handleMainNavigate} />}
       {screen === 'recipe' && <Recipe onNavigate={handleMainNavigate} savedIds={savedIds} onToggleSave={toggleRecipeSave} listState={recipeListState} onListStateChange={setRecipeListState} />}
       {screen === 'mypage' && <MyPage onDraftChange={syncMyPageDraft} onNavigate={handleMainNavigate} onEditProfile={handleEditProfile} initialAlerts={alerts} account={account} nickname={nickname} initialPreferences={preferences} />}
+      {screen === 'shopping' && <Cart items={cartItems} onItemsChange={setCartItems} onOpenPackageSolution={handleOpenPackageSolution} onStartRegistration={handleStartRegistration} registrationMessage={history.state?.registrationMessage} onNavigate={handleMainNavigate} onBack={() => { if (history.state?.fromApp) history.back(); else handleMainNavigate('/') }} onFooterHeight={setShoppingFooterHeight} />}
       <FloatingAssistant onClick={() => handleMainNavigate('/ai-chat')} />
     </div>
   )
