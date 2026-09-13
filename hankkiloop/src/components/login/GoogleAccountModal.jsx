@@ -1,5 +1,6 @@
 import { defaultGoogleAccount } from '../../data/googleAccount'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
+import BottomSheet from '../common/BottomSheet'
 import googleLogo from '../../assets/google-logo.svg'
 import sproutIcon from '../../assets/icons/sprout.svg'
 import closeIcon from '../../assets/icons/close.svg'
@@ -10,75 +11,7 @@ import arrowIcon from '../../assets/icons/continue-arrow.svg'
 import shieldIcon from '../../assets/icons/shield.svg'
 
 export default function GoogleAccountModal({ onClose, onTerms, onPrivacy, account = defaultGoogleAccount, onContinue }) {
-  const dialogRef = useRef(null)
-  const sheetRef = useRef(null)
-  const dragRef = useRef(null)
-  const [sheetHeight, setSheetHeight] = useState(null)
-
-  const resizeSheet = (height) => {
-    const viewportHeight = dialogRef.current.clientHeight
-    setSheetHeight(Math.max(Math.min(180, viewportHeight), Math.min(viewportHeight, height)))
-  }
-
-  const handleDragStart = (event) => {
-    if (!event.isPrimary || event.button !== 0) return
-    dragRef.current = {
-      pointerId: event.pointerId,
-      startY: event.clientY,
-      startHeight: sheetRef.current.getBoundingClientRect().height,
-    }
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-
-  const handleDragMove = (event) => {
-    const drag = dragRef.current
-    if (!drag || drag.pointerId !== event.pointerId) return
-    resizeSheet(drag.startHeight + drag.startY - event.clientY)
-  }
-
-  const handleDragEnd = () => {
-    dragRef.current = null
-  }
-
-  const handleResizeKey = (event) => {
-    if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
-    event.preventDefault()
-    const height = sheetRef.current.getBoundingClientRect().height
-    resizeSheet(event.key === 'Home' ? 180
-      : event.key === 'End' ? dialogRef.current.clientHeight
-      : height + (event.key === 'ArrowUp' ? 40 : -40))
-  }
-
   const [selectedAccount, setSelectedAccount] = useState(account)
-
-  useEffect(() => {
-    const dialog = dialogRef.current
-    const previousOverflow = document.body.style.overflow
-    const previousFocus = document.activeElement
-    dialog.showModal()
-    document.body.style.overflow = 'hidden'
-
-    return () => {
-      dialog.close()
-      document.body.style.overflow = previousOverflow
-      previousFocus?.focus()
-    }
-  }, [])
-
-  const handleKeyDown = (event) => {
-    if (event.key !== 'Tab') return
-    const buttons = Array.from(dialogRef.current.querySelectorAll('button:not(:disabled)'))
-      .filter((button) => button.tabIndex >= 0)
-    const first = buttons[0]
-    const last = buttons[buttons.length - 1]
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault()
-      last?.focus()
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault()
-      first?.focus()
-    }
-  }
 
   const handleOtherGoogleAccount = () => {
     // TODO: Google OAuth 계정 선택 연결
@@ -92,42 +25,8 @@ export default function GoogleAccountModal({ onClose, onTerms, onPrivacy, accoun
   }
 
   return (
-    <dialog
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      onKeyDown={handleKeyDown}
-      aria-labelledby="google-account-title"
-      aria-describedby="google-account-description"
-      onCancel={(event) => {
-        event.preventDefault()
-        onClose()
-      }}
-      className="fixed inset-0 z-50 m-0 h-dvh max-h-none w-full max-w-none overflow-hidden border-0 bg-transparent p-0 text-[#161c25] backdrop:bg-transparent"
-    >
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label="계정 선택 배경 닫기"
-        onClick={onClose}
-        className="absolute inset-0 size-full cursor-default bg-[#161c25]/30 backdrop-blur-[3px] transition-opacity duration-150 starting:opacity-0 motion-reduce:transition-none"
-      />
-      <div ref={sheetRef} style={sheetHeight === null ? undefined : { height: sheetHeight }} className="absolute bottom-0 left-1/2 flex max-h-[100dvh] w-full flex-col max-w-app -translate-x-1/2 overflow-hidden rounded-t-[32px] border-t border-[#bbcabf]/30 bg-white shadow-[0_-10px_40px_-10px_rgba(0,108,73,0.08),0_-4px_16px_-4px_rgba(22,28,37,0.05)] transition-[translate,opacity] duration-200 ease-out starting:translate-y-4 starting:opacity-0 motion-reduce:transition-none">
-        <button
-          type="button"
-          aria-label="계정 선택 시트 높이 조절"
-          onPointerDown={handleDragStart}
-          onPointerMove={handleDragMove}
-          onPointerUp={handleDragEnd}
-          onPointerCancel={handleDragEnd}
-          onLostPointerCapture={handleDragEnd}
-          onKeyDown={handleResizeKey}
-          className="flex h-[34px] w-full shrink-0 touch-none select-none items-start justify-center rounded-t-[32px] pt-3 cursor-grab active:cursor-grabbing"
-        >
-          <span aria-hidden="true" className="h-1.5 w-12 rounded-full bg-[#bbcabf]/60" />
-        </button>
-        <div className="min-h-0 overflow-y-auto overscroll-contain px-6 pb-[max(32px,env(safe-area-inset-bottom))]">
-
+    <BottomSheet onClose={onClose} labelledBy="google-account-title" describedBy="google-account-description" label="계정 선택">
+      <div className="px-6 pb-[max(32px,env(safe-area-inset-bottom))]">
         <header className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <span className="flex size-8 items-center justify-center rounded-xl bg-[#006c49]/10 shadow-xs">
@@ -211,7 +110,6 @@ export default function GoogleAccountModal({ onClose, onTerms, onPrivacy, accoun
           </div>
         </div>
       </div>
-        </div>
-    </dialog>
+    </BottomSheet>
   )
 }
