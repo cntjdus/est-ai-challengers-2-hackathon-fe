@@ -1,0 +1,24 @@
+import { CalendarDays, Lightbulb, Refrigerator, Snowflake, Sprout, Thermometer } from 'lucide-react'
+import { storageOptions } from '../../data/materialRegistration'
+const storageIcons = { fridge: Refrigerator, freezer: Snowflake, room: Thermometer }
+function DateField({ label, value, onChange, min }) {
+  const date = value ? new Date(value + 'T12:00:00') : null
+  const formatted = date && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }).format(date) : '날짜를 선택해주세요'
+  return <label className="relative flex h-11 min-w-0 items-center justify-between gap-2 rounded-2xl border border-[#e2e8f0] bg-white px-3">
+    <span className="min-w-0 truncate text-[13px] font-semibold">{formatted}</span><CalendarDays aria-hidden="true" className="size-4 shrink-0 text-[#94a3b8]" />
+    <input type="date" aria-label={label} value={value} min={min} onChange={(event) => onChange(event.target.value)} className="absolute inset-0 size-full cursor-pointer opacity-0 focus:opacity-100 focus:bg-white focus:px-3" />
+  </label>
+}
+export default function IngredientRegisterForm({ material, onChange }) {
+  const policy = storageOptions.find((option) => option.id === material.storageType)
+  return <section aria-label="재료 정보 입력" className="overflow-hidden rounded-3xl border border-[#e5ece7] bg-white shadow-xs">
+    <div className="flex items-center gap-3 border-b border-[#f1f5f9]"><span className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-[#a7f3d0]/70 bg-[#ecfdf5]"><Sprout aria-hidden="true" className="size-7 text-[#10b981]" /></span><h2 className="min-w-0 break-words text-sm">{material.ingredientName || '식재료'}</h2></div>
+    <div className="space-y-4 p-3">
+      <div className="grid grid-cols-2 gap-3"><label className="min-w-0 text-[11px] text-[#64748b]">식재료<input aria-label="식재료" required value={material.ingredientName} onChange={(event) => onChange({ ingredientName: event.target.value })} className="mt-1 block h-11 w-full rounded-2xl border border-[#e2e8f0] px-3 text-sm text-[#1e293b]" /></label><label className="min-w-0 text-[11px] text-[#64748b]">구매량<span className="mt-1 flex h-11 items-center rounded-2xl border border-[#e2e8f0] px-3"><input type="number" min="0.001" step="any" required aria-label="구매량" value={material.purchaseAmount} onChange={(event) => onChange({ purchaseAmount: event.target.value })} className="min-w-0 w-full bg-transparent text-sm font-semibold text-[#1e293b] outline-none" /><span className="ml-1 text-sm text-[#1e293b]">{material.unit}</span></span></label></div>
+      <fieldset><legend className="mb-2 text-[11px] text-[#64748b]">보관장소 선택</legend><div className="grid grid-cols-3 gap-2">{storageOptions.map((option) => { const Icon = storageIcons[option.icon]; return <label key={option.id} className="relative cursor-pointer"><input type="radio" name="storageType" aria-label={option.label} value={option.id} checked={material.storageType === option.id} onChange={() => onChange({ storageType: option.id })} className="peer absolute inset-0 z-10 size-full cursor-pointer opacity-0" /><span className="flex min-h-21 flex-col items-center justify-center gap-1 rounded-2xl border border-[#e2e8f0] px-1 py-3 text-xs peer-checked:border-[#10b981] peer-checked:bg-[#effcf4] peer-checked:ring-1 peer-checked:ring-[#10b981] peer-focus-visible:outline-2 peer-focus-visible:outline-[#006c49]"><Icon aria-hidden="true" className="size-4 text-[#56b6c6]" />{option.label}<span className="text-[9px] text-[#94a3b8]">{option.note}</span></span>{option.recommended && <span className="absolute -top-1.5 right-2 rounded-full bg-[#10b981] px-1.5 text-[8px] text-white">추천</span>}</label> })}</div></fieldset>
+      <div><p className="mb-1 text-[11px] text-[#64748b]">구매일 (등록일)</p><DateField label="구매일" value={material.purchaseDate} onChange={(purchaseDate) => onChange({ purchaseDate })} /></div>
+      <div><div className="mb-1 flex items-center justify-between gap-1"><span className="text-[11px] text-[#64748b]">소비기한</span><span className="rounded-full border border-[#a7f3d0]/70 bg-[#ecfdf5] px-2 py-0.5 text-[9px] text-[#008768]">{material.expiryAutomatic ? '자동 계산됨' : '직접 수정'}</span></div><DateField label="소비기한" value={material.expiryDate} min={material.purchaseDate} onChange={(expiryDate) => onChange({ expiryDate, expiryAutomatic: false })} />{material.expiryAutomatic && policy && <p className="mt-1 text-right text-[10px] font-semibold text-[#008768]">+{policy.days}일 ({policy.label}보관)</p>}</div>
+      <aside className="flex items-start gap-2 rounded-2xl border border-[#e5ece7] bg-[#fafcf9] p-3 text-[11px] leading-[18px] text-[#64748b]"><Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[#008768]" /><div><p>한끼루프 보관 가이드: {material.storageGuide}</p><p className="mt-1 text-[10px] text-[#94a3b8]">자동 날짜는 임시 기준입니다. 제품 표시를 확인해주세요.</p></div></aside>
+    </div>
+  </section>
+}
