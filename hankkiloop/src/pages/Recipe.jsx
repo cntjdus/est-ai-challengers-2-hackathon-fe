@@ -1,5 +1,4 @@
 import { recipes } from '../data/recipes'
-import FloatingAssistant from '../components/common/FloatingAssistant'
 import { useEffect, useRef, useState } from 'react'
 import { CirclePlus, Flame, Search } from 'lucide-react'
 import HomeHeader from '../components/home/HomeHeader'
@@ -14,6 +13,7 @@ export default function Recipe({ onNavigate, savedIds, onToggleSave, listState, 
   const [category, setCategory] = useState(listState.category ?? categories[0])
   const [query, setQuery] = useState(listState.query ?? '')
   const [search, setSearch] = useState(listState.search ?? '')
+  useEffect(() => { onListStateChange({ tab, category, query, search }) }, [tab, category, query, search, onListStateChange])
   const pageRef = useRef(null)
   useEffect(() => { pageRef.current.focus() }, [])
   const visibleRecipes = recipes.filter((recipe) =>
@@ -21,7 +21,6 @@ export default function Recipe({ onNavigate, savedIds, onToggleSave, listState, 
     (category === categories[0] || recipe.sourceType === ({ '유튜브 레시피': 'youtube', '블로그 레시피': 'blog', '냉장고 파먹기': 'fridge' })[category]) &&
     (!search || (recipe.title + recipe.ingredientSummary).includes(search)))
   const handleNotifications = () => { /* TODO: 알림 화면 연결 */ }
-  const handleAssistant = () => { /* TODO: AI 레시피 도우미 연결 */ }
   return (
     <div ref={pageRef} tabIndex={-1} className="relative mx-auto flex h-dvh w-full max-w-app flex-col overflow-hidden bg-[#fafcf9] outline-none">
       <HomeHeader pageLabel="레시피" onProfile={() => onNavigate('/mypage')} onNotifications={handleNotifications} />
@@ -44,7 +43,6 @@ export default function Recipe({ onNavigate, savedIds, onToggleSave, listState, 
         <aside className="mt-6 flex items-center gap-3 rounded-2xl border border-[#e0e7ed] bg-[#eff4ff] p-4"><img src={character} alt="" className="size-11 shrink-0 rounded-xl bg-[#cce3e5] p-1 object-contain" /><div><h2 className="text-base text-[#1e293b]">예상 식비 절약 & 소진 효과</h2><p className="mt-1 text-[13px] leading-[18px] text-[#596a60]">추천 메뉴로 냉장고 속 <span className="text-[#008768]">대파, 두부, 양파</span>를 알뜰하게 비워낼 수 있어요!</p></div></aside>
         <section className="mt-7"><div className="mb-3 flex items-center justify-between gap-1"><h2 className="text-base text-[#1e293b]">{tab === 'saved' ? '스크랩한 레시피' : '냉장고 맞춤 추천 레시피'}<span className="ml-1 rounded-full bg-[#006c49] px-2 text-[11px] text-white">{visibleRecipes.length}선</span></h2><span className="shrink-0 text-[10px] text-[#839087]">소비기한 임박 우선</span></div><div className="flex flex-col gap-3">{visibleRecipes.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} onOpen={() => { onListStateChange({ tab, category, query, search }); onNavigate('/recipe/' + recipe.id) }} saved={savedIds.includes(recipe.id)} onToggleSave={() => onToggleSave(recipe.id)} />)}{visibleRecipes.length === 0 && <p role="status" className="rounded-2xl bg-white px-4 py-8 text-center text-sm text-[#64748b]">{tab === 'saved' ? '스크랩한 레시피가 없습니다.' : '검색 조건에 맞는 레시피가 없습니다.'}</p>}</div></section>
       </main>
-      <FloatingAssistant onClick={handleAssistant} />
       <BottomNavigation onNavigate={onNavigate} />
     </div>
   )

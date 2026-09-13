@@ -3,6 +3,7 @@
 @theme {
   --container-app: 390px;
   --spacing-app-header: 64px;
+  --spacing-bottom-nav: 72px;
   --font-sans: "Plus Jakarta Sans", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
 }
 
