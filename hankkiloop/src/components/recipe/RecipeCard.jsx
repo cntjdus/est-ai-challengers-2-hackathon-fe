@@ -1,5 +1,10 @@
-import { Bookmark, CircleCheck, CirclePlay, EggFried, Image as ImageIcon, NotebookText, PiggyBank } from 'lucide-react'
-export default function RecipeCard({ recipe, saved, onToggleSave, onOpen }) {
+import { Bookmark, ChevronRight, CircleCheck, CirclePlay, EggFried, Image as ImageIcon, NotebookText, PiggyBank } from 'lucide-react'
+export default function RecipeCard({ recipe, saved, onToggleSave, onOpen, compact = false, usage }) {
+
+  if (compact) return <article className="relative flex items-center gap-3 rounded-2xl border border-[#d1fae5] bg-white p-3">
+    <div className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#e9eefb]">{recipe.image ? <img src={recipe.image} alt={recipe.title} className="size-full object-cover" /> : <ImageIcon aria-hidden="true" className="size-6 text-[#94a3b8]" />}<span className="absolute right-1 bottom-1 rounded bg-black/70 px-1 text-[9px] text-white">{recipe.minutes}분</span></div>
+    <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1">{usage && <span className="rounded bg-[#d1fae5] px-1.5 py-0.5 text-[9px] text-[#008768]">{usage}</span>}<span className="text-[9px] text-[#98a2b3]">{recipe.tag}</span></div><h3 className="mt-1 text-[13px]"><a href={`/recipe/${recipe.id}`} onClick={(event) => { if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); onOpen() } }} className="after:absolute after:inset-0 after:rounded-2xl focus-visible:after:outline-2 focus-visible:after:outline-[#007f5c]">{recipe.title}</a></h3><p className="mt-1 truncate text-[10px] text-[#8792a2]">{recipe.ingredientSummary}</p></div><ChevronRight aria-hidden="true" className="size-5 shrink-0 text-[#cbd5e1]" />
+  </article>
   const SourceIcon = recipe.sourceType === 'youtube' ? CirclePlay : NotebookText
   return (
     <article className="relative flex items-start gap-3 rounded-2xl border border-[#e0e7f5] bg-white p-4 shadow-xs">

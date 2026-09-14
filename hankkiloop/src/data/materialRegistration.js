@@ -56,3 +56,11 @@ export function registerMaterials(inventory, materials) {
   }
   return next
 }
+
+export function createDirectRegistrationDraft() {
+  const id = 'direct-' + crypto.randomUUID()
+  const today = localDate()
+  return [{ id, ingredientId: id, ingredientName: '', purchaseAmount: '', unit: 'g', inventoryPerUnit: 1,
+    storageType: 'fridge', purchaseDate: today, expiryDate: calculateExpiryDate('fridge', today),
+    expiryAutomatic: true, storageGuide: storageGuides.fridge, recognizedFromPhoto: false, direct: true }]
+}
