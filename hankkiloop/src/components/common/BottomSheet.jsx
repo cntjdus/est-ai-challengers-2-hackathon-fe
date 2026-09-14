@@ -1,9 +1,11 @@
+import useModalDialog from '../../hooks/useModalDialog'
 import { useEffect, useRef, useState } from 'react'
 
 // Shared by stock deduction and AI chat. Snapping is opt-in for the chat UX.
 export default function BottomSheet({ onClose, labelledBy, describedBy, header, footer, children, label = '시트', initialHeight = 0.78, snapPoints, closeThreshold = 0.3, contentClassName = '', fitVisualViewport = false }) {
   const useVisualViewport = fitVisualViewport || Boolean(snapPoints)
   const dialogRef = useRef(null)
+  useModalDialog(dialogRef)
   const sheetRef = useRef(null)
   const contentRef = useRef(null)
   const dragRef = useRef(null)
@@ -36,11 +38,6 @@ export default function BottomSheet({ onClose, labelledBy, describedBy, header, 
     return () => clearTimeout(timer)
   }, [closing, onClose])
   useEffect(() => {
-    const dialog = dialogRef.current
-    const focus = document.activeElement
-    const overflow = document.body.style.overflow
-    dialog.showModal()
-    document.body.style.overflow = 'hidden'
     const resize = () => {
       const size = useVisualViewport ? (window.visualViewport?.height ?? innerHeight) : innerHeight
       viewportRef.current = size
@@ -77,9 +74,6 @@ export default function BottomSheet({ onClose, labelledBy, describedBy, header, 
     content.addEventListener('touchend', end)
     content.addEventListener('touchcancel', end)
     return () => {
-      dialog.close()
-      document.body.style.overflow = overflow
-      focus?.focus({ preventScroll: true })
       window.removeEventListener('resize', resize)
       window.visualViewport?.removeEventListener('resize', resize)
       window.visualViewport?.removeEventListener('scroll', resize)
