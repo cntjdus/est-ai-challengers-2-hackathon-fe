@@ -1,15 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowDownUp, ChevronRight, Map, MapPin, Refrigerator, RefreshCcw, X } from 'lucide-react'
 import EditProfileHeader from '../components/profile/EditProfileHeader'
 import ProductOptionCard from '../components/cart/ProductOptionCard'
 import { calculatePackageWaste, getPackageOptions, getRecommendedProduct, packageFilters, packageLocation } from '../data/packageOptions'
 
 const matchesFilter = (product, filter) => filter === 'all' || product.channelType === filter
-export default function PackageSolution({ item, onBack, onClose, onReplace }) {
+export default function PackageSolution({ item, onBack, onClose, onReplace, onOpenMap }) {
   const products = getPackageOptions(item)
   const recommended = getRecommendedProduct(products, item?.plannedUsage ?? 0)
-  const [selectedProductId, setSelectedProductId] = useState(recommended?.id ?? null)
-  const [filter, setFilter] = useState('all')
+  const [selectedProductId, setSelectedProductId] = useState(history.state?.packageView?.selectedProductId ?? recommended?.id ?? null)
+  const [filter, setFilter] = useState(history.state?.packageView?.filter ?? 'all')
   const [notice, setNotice] = useState('')
   const visibleProducts = products.filter((product) => matchesFilter(product, filter))
   const selectedProduct = visibleProducts.find((product) => product.id === selectedProductId)
@@ -18,14 +18,16 @@ export default function PackageSolution({ item, onBack, onClose, onReplace }) {
     setFilter(value)
     if (selectedProduct && !matchesFilter(selectedProduct, value)) setSelectedProductId(null)
   }
-  const handleOpenMap = () => setNotice('매장 지도 기능은 준비 중입니다.')
+  const mainRef = useRef(null)
+  useEffect(() => { mainRef.current.scrollTop = history.state?.packageView?.scrollTop ?? 0 }, [])
+  const handleOpenMap = () => onOpenMap({ selectedProductId: selectedProduct?.id ?? null, filter, scrollTop: mainRef.current.scrollTop })
   const handleReplaceCartItem = () => {
     if (!item || !selectedProduct) return
     try { onReplace(item.id, selectedProduct) } catch (error) { setNotice(error.message) }
   }
   return <div className="mx-auto flex h-dvh w-full max-w-app flex-col overflow-hidden bg-white text-[#1e293b]">
     <EditProfileHeader title="소포장 식재료 찾기" subtitle="1인 가구 음식물 쓰레기 ZERO 루프" plain onBack={onBack} action={<button type="button" aria-label="소포장 찾기 닫기" onClick={onClose} className="flex size-9 items-center justify-center rounded-full"><X aria-hidden="true" className="size-5" /></button>} />
-    <main aria-label="소포장 상품 비교" className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-[#e2e8f0] px-4 pt-3 pb-6">
+    <main ref={mainRef} aria-label="소포장 상품 비교" className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-[#e2e8f0] px-4 pt-3 pb-6">
       {!item ? <div className="py-12 text-center"><p className="text-sm">분석할 장바구니 상품이 없습니다.</p><button type="button" onClick={onClose} className="mt-5 rounded-xl bg-[#006c49] px-4 py-3 text-sm text-white">장바구니로 돌아가기</button></div> : <>
         <section aria-label="현재 상품 용량 분석" className="rounded-2xl border border-[#cbd8e7] p-4 shadow-xs">
           <div className="flex items-center gap-2"><span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-[#a7f3d0] bg-[#ecfdf5] text-[#008768]"><RefreshCcw aria-hidden="true" className="size-5" /></span><div className="min-w-0 flex-1"><h2 className="text-[10px] font-semibold text-[#64748b]">현재 레시피 식재료</h2><p className="mt-1 text-sm font-bold">{item.name}</p><span className="mt-1 inline-block rounded border border-[#fecaca] bg-[#fff3f3] px-2 py-0.5 text-[10px] font-bold text-[#f43f5e]">낭비 위험 {analysis.wasteRate}%</span></div><div className="shrink-0 text-right"><p className="text-[10px] text-[#7c8595]">실제 필요량</p><p className="mt-1 text-xl font-bold text-[#007f5c]">{analysis.required}{item.amountUnit}</p></div></div>

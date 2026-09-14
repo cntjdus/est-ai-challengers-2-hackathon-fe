@@ -1,0 +1,6 @@
+.package-map { background-color: #f4f7f1; background-image: linear-gradient(90deg, transparent 19%, white 19%, white 22%, transparent 22%, transparent 49%, white 49%, white 52%, transparent 52%, transparent 79%, white 79%, white 82%, transparent 82%), linear-gradient(0deg, transparent 26%, white 26%, white 29%, transparent 29%, transparent 62%, white 62%, white 65%, transparent 65%); }
+.package-map-park { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 0 26%, #e3eee3 0 18%, transparent 18.2%), radial-gradient(ellipse at 100% 76%, #e3eee3 0 22%, transparent 22.2%); }
+.package-map-road { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(46deg, transparent 47%, white 47%, white 49%, transparent 49%); }
+.package-map--layers .package-map-road { background: linear-gradient(46deg, transparent 47%, #d3e6dd 47%, #d3e6dd 49%, transparent 49%); }
+.package-store-marker::after { content: ''; position: absolute; top: 100%; left: calc(50% - 7px); border: 7px solid transparent; border-top-color: white; }
+.package-store-marker[aria-pressed=true]::after { border-top-color: #007451; }

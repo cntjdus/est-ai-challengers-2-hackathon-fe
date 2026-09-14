@@ -4,6 +4,7 @@ import { createExpiryNotifications, createMenuNotifications, markNotificationAsR
 import IngredientDetail from './pages/IngredientDetail'
 import Fridge from './pages/Fridge'
 import PackageSolution from './pages/PackageSolution'
+
 import { getPackageOptions, replaceCartItem } from './data/packageOptions'
 import MaterialRegister from './pages/MaterialRegister'
 import { registerMaterials } from './data/materialRegistration'
@@ -19,17 +20,26 @@ import EditProfilePage from './pages/EditProfilePage'
 import MyPage from './pages/MyPage'
 import PreferenceSetupPage from './pages/PreferenceSetupPage'
 import OnboardingPage from './pages/OnboardingPage'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import LoginPage from './pages/LoginPage'
 import AccountConsentPage from './pages/AccountConsentPage'
 import { defaultGoogleAccount } from './data/googleAccount'
 
+const PackageMap = lazy(() => import('./pages/PackageMap'))
+
 export default function App() {
-  const [screen, setScreen] = useState(() => location.pathname.startsWith('/fridge/') ? 'ingredientDetail' : location.pathname === '/fridge' ? 'fridge' : location.pathname === '/shopping/package-solution' ? 'packageSolution' : location.pathname === '/shopping/register' ? 'register' : location.pathname === '/shopping' ? 'shopping' : location.pathname === '/ai-chat' ? 'aiChat' : location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : 'login')
+  const [screen, setScreen] = useState(() => location.pathname.startsWith('/fridge/') ? 'ingredientDetail' : location.pathname === '/fridge' ? 'fridge' : location.pathname === '/shopping/package-solution/map' ? 'packageMap' : location.pathname === '/shopping/package-solution' ? 'packageSolution' : location.pathname === '/shopping/register' ? 'register' : location.pathname === '/shopping' ? 'shopping' : location.pathname === '/ai-chat' ? 'aiChat' : location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : 'login')
   const [cartItems, setCartItems] = useState(() => history.state?.cartItems ?? initialCartItems)
   const [registeredMaterials, setRegisteredMaterials] = useState(() => history.state?.registeredMaterials ?? [])
   const [isAIChatOpen, setAIChatOpen] = useState(false)
-  const closeAIChat = useCallback(() => { setAIChatOpen(false); requestAnimationFrame(() => document.querySelector('[aria-label="AI 채팅 열기"]')?.focus({ preventScroll: true })) }, [])
+  const closeAIChat = useCallback(() => setAIChatOpen(false), [])
+  const wasAIChatOpen = useRef(false)
+  useLayoutEffect(() => {
+    const shouldRestore = wasAIChatOpen.current && !isAIChatOpen
+    wasAIChatOpen.current = isAIChatOpen
+    if (!shouldRestore) return
+    document.querySelector('[aria-label="AI 채팅 열기"]')?.focus({ preventScroll: true })
+  }, [isAIChatOpen])
   const [isNotificationOpen, setNotificationOpen] = useState(false)
   const [notificationReadIds, setNotificationReadIds] = useState([])
   const [notificationNow] = useState(() => new Date())
@@ -87,7 +97,7 @@ export default function App() {
       if (history.state?.nickname !== undefined) setNickname(history.state.nickname)
       setPreferences(history.state?.preferences)
       setAlerts(history.state?.alerts)
-      setScreen(location.pathname.startsWith('/fridge/') ? 'ingredientDetail' : location.pathname === '/fridge' ? 'fridge' : location.pathname === '/shopping/package-solution' ? 'packageSolution' : location.pathname === '/shopping/register' ? 'register' : location.pathname === '/shopping' ? 'shopping' : location.pathname === '/ai-chat' ? 'aiChat' : location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : (history.state?.screen ?? 'login'))
+      setScreen(location.pathname.startsWith('/fridge/') ? 'ingredientDetail' : location.pathname === '/fridge' ? 'fridge' : location.pathname === '/shopping/package-solution/map' ? 'packageMap' : location.pathname === '/shopping/package-solution' ? 'packageSolution' : location.pathname === '/shopping/register' ? 'register' : location.pathname === '/shopping' ? 'shopping' : location.pathname === '/ai-chat' ? 'aiChat' : location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : (history.state?.screen ?? 'login'))
     }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
@@ -153,6 +163,19 @@ export default function App() {
     history.pushState({ ...profile, fromShopping: true, fromRegistration: location.pathname === '/shopping/register', packageItemId: item.id, solutionId: crypto.randomUUID() }, '', '/shopping/package-solution')
     setScreen('packageSolution')
   }
+  const handleOpenPackageMap = (packageView) => {
+    const state = { ...history.state, cartItems, registeredMaterials, inventory, packageView }
+    history.replaceState(state, '', location.href)
+    history.pushState({ ...state, fromPackageSolution: true }, '', '/shopping/package-solution/map')
+    setScreen('packageMap')
+  }
+  const handleClosePackageMap = () => {
+    if (history.state?.fromPackageSolution) history.back()
+    else {
+      history.replaceState({ ...history.state }, '', '/shopping/package-solution')
+      setScreen('packageSolution')
+    }
+  }
   const handleReplaceCartItem = (itemId, selectedProduct) => {
     const original = cartItems.find((item) => item.id === itemId)
     const product = original && getPackageOptions(original).find((option) => option.id === selectedProduct.id)
@@ -173,7 +196,8 @@ export default function App() {
   }
   const renderScreen = () => {
   if (screen === 'ingredientDetail') return <IngredientDetail key={location.pathname} itemId={location.pathname.slice('/fridge/'.length)} inventory={inventory} registeredMaterials={registeredMaterials} onNavigate={handleMainNavigate} onBack={() => { if (history.state?.fromFridge) history.back(); else handleMainNavigate('/fridge') }} onBrowseRecipes={(name) => { setRecipeListState({ tab: 'recipes', category: 'AI 추천 메뉴', query: name, search: name }); handleMainNavigate('/recipe') }} />
-  if (screen === 'packageSolution') return <PackageSolution key={history.state?.solutionId ?? 'empty'} item={cartItems.find((item) => item.id === history.state?.packageItemId)} onBack={() => { if (history.state?.fromShopping) history.back(); else handleMainNavigate('/shopping') }} onClose={() => { if (history.state?.fromRegistration) history.back(); else handleMainNavigate('/shopping') }} onReplace={handleReplaceCartItem} />
+  if (screen === 'packageMap') return <Suspense fallback={<div role="status" className="mx-auto flex h-dvh max-w-app items-center justify-center bg-white text-sm text-[#007451]">지도를 불러오는 중…</div>}><PackageMap key={history.state?.solutionId ?? 'empty'} item={cartItems.find((item) => item.id === history.state?.packageItemId)} selectedProductId={history.state?.packageView?.selectedProductId} onBack={handleClosePackageMap} onReplace={handleReplaceCartItem} /></Suspense>
+  if (screen === 'packageSolution') return <PackageSolution key={history.state?.solutionId ?? 'empty'} item={cartItems.find((item) => item.id === history.state?.packageItemId)} onBack={() => { if (history.state?.fromShopping) history.back(); else handleMainNavigate('/shopping') }} onClose={() => { if (history.state?.fromRegistration) history.back(); else handleMainNavigate('/shopping') }} onOpenMap={handleOpenPackageMap} onReplace={handleReplaceCartItem} />
   if (screen === 'register') return <MaterialRegister key={history.state?.registrationId ?? 'empty'} source={history.state?.source} items={history.state?.registrationItems ?? []} onNavigate={handleMainNavigate} onBack={() => { if (history.state?.fromShopping || history.state?.source === 'fridge-direct') history.back(); else handleMainNavigate('/shopping') }} onRegister={handleRegisterToFridge} onOpenPackageSolution={handleOpenPackageSolution} />
   if (screen === 'recipeDetail') return <RecipeDetail registeredMaterials={registeredMaterials} inventory={inventory} onDeductStock={handleStockDeduction} key={location.pathname} recipeId={location.pathname.slice('/recipe/'.length)} savedIds={savedIds} onToggleSave={toggleRecipeSave} onBack={() => { if (history.state?.fromRecipe) history.back(); else handleMainNavigate('/recipe') }} />
   if (screen === 'aiChat') return <AIChat onNavigate={handleMainNavigate} messages={chatMessages} onMessagesChange={setChatMessages} />

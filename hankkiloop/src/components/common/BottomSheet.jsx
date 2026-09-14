@@ -2,10 +2,10 @@ import useModalDialog from '../../hooks/useModalDialog'
 import { useEffect, useRef, useState } from 'react'
 
 // Shared by stock deduction and AI chat. Snapping is opt-in for the chat UX.
-export default function BottomSheet({ onClose, labelledBy, describedBy, header, footer, children, label = '시트', initialHeight = 0.78, snapPoints, closeThreshold = 0.3, contentClassName = '', fitVisualViewport = false }) {
+export default function BottomSheet({ onClose, labelledBy, describedBy, header, footer, children, label = '시트', initialHeight = 0.78, snapPoints, closeThreshold = 0.3, contentClassName = '', fitVisualViewport = false, modal = true, dismissible = true, maxHeightRatio = 0.95 }) {
   const useVisualViewport = fitVisualViewport || Boolean(snapPoints)
   const dialogRef = useRef(null)
-  useModalDialog(dialogRef)
+  useModalDialog(dialogRef, modal)
   const sheetRef = useRef(null)
   const contentRef = useRef(null)
   const dragRef = useRef(null)
@@ -18,10 +18,10 @@ export default function BottomSheet({ onClose, labelledBy, describedBy, header, 
   const [viewport, setViewport] = useState(() => ({ height: useVisualViewport ? (window.visualViewport?.height ?? innerHeight) : innerHeight, top: useVisualViewport ? (window.visualViewport?.offsetTop ?? 0) : 0 }))
   const viewportRef = useRef(viewport.height)
   const updateHeight = (value) => { heightRef.current = value; if (!snapPoints) ratioRef.current = value / viewportRef.current; setHeight(value) }
-  const close = () => setClosing(true)
+  const close = () => { if (dismissible) setClosing(true) }
   const settle = () => {
     const current = heightRef.current ?? sheetRef.current.offsetHeight
-    if (current < viewportRef.current * closeThreshold) close()
+    if (dismissible && current < viewportRef.current * closeThreshold) close()
     else if (snapPoints) {
       const ratio = snapPoints.reduce((nearest, point) => Math.abs(point * viewportRef.current - current) < Math.abs(nearest * viewportRef.current - current) ? point : nearest)
       ratioRef.current = ratio
@@ -43,7 +43,7 @@ export default function BottomSheet({ onClose, labelledBy, describedBy, header, 
       viewportRef.current = size
       setViewport({ height: size, top: useVisualViewport ? (window.visualViewport?.offsetTop ?? 0) : 0 })
       if (useVisualViewport) { heightRef.current = ratioRef.current * size; setHeight(heightRef.current) }
-      else setHeight((current) => current === null ? null : Math.min(current, size * 0.95))
+      else setHeight((current) => current === null ? null : Math.min(current, size * maxHeightRatio))
     }
     window.addEventListener('resize', resize)
     if (useVisualViewport) { window.visualViewport?.addEventListener('resize', resize); window.visualViewport?.addEventListener('scroll', resize) }
@@ -63,7 +63,7 @@ export default function BottomSheet({ onClose, labelledBy, describedBy, header, 
         event.preventDefault()
         touch.moved = true
         setDragging(true)
-        const next = Math.max(60, Math.min(viewportRef.current * 0.95, touch.height - delta))
+        const next = Math.max(60, Math.min(viewportRef.current * maxHeightRatio, touch.height - delta))
         heightRef.current = next
         setHeight(next)
       }
@@ -82,7 +82,7 @@ export default function BottomSheet({ onClose, labelledBy, describedBy, header, 
       content.removeEventListener('touchend', end)
       content.removeEventListener('touchcancel', end)
     }
-  }, [snapPoints, useVisualViewport])
+  }, [snapPoints, useVisualViewport, maxHeightRatio])
   const startDrag = (event, content = false) => {
     if (!event.isPrimary || event.button !== 0 || event.target.closest('input,textarea,select,a') || (event.target.closest('button') && !event.target.closest('[data-handle]'))) return
     dragRef.current = { id: event.pointerId, y: event.clientY, height: sheetRef.current.offsetHeight, content }
@@ -95,7 +95,7 @@ export default function BottomSheet({ onClose, labelledBy, describedBy, header, 
     const delta = event.clientY - drag.y
     if (drag.content && delta < 6) return
     setDragging(true)
-    updateHeight(Math.max(60, Math.min(viewportRef.current * 0.95, drag.height - delta)))
+    updateHeight(Math.max(60, Math.min(viewportRef.current * maxHeightRatio, drag.height - delta)))
   }
   const endDrag = () => { if (dragRef.current) settle() }
   const handleKey = (event) => {
@@ -103,14 +103,15 @@ export default function BottomSheet({ onClose, labelledBy, describedBy, header, 
     event.preventDefault()
     if (snapPoints) {
       const current = (heightRef.current ?? sheetRef.current.offsetHeight) / viewportRef.current
-      if (event.key === 'ArrowDown' && current <= snapPoints[0] + 0.01) { close(); return }
+      if (dismissible && event.key === 'ArrowDown' && current <= snapPoints[0] + 0.01) { close(); return }
       ratioRef.current = ['ArrowUp', 'End'].includes(event.key) ? snapPoints.at(-1) : snapPoints[0]
       updateHeight(ratioRef.current * viewportRef.current)
-    } else updateHeight(event.key === 'End' ? viewportRef.current * 0.95 : event.key === 'Home' ? viewportRef.current * 0.4 : Math.max(viewportRef.current * 0.3, Math.min(viewportRef.current * 0.95, sheetRef.current.offsetHeight + (event.key === 'ArrowUp' ? 40 : -40))))
+    } else updateHeight(event.key === 'End' ? viewportRef.current * maxHeightRatio : event.key === 'Home' ? viewportRef.current * 0.4 : Math.max(viewportRef.current * 0.3, Math.min(viewportRef.current * maxHeightRatio, sheetRef.current.offsetHeight + (event.key === 'ArrowUp' ? 40 : -40))))
   }
-  return <dialog ref={dialogRef} aria-label={labelledBy ? undefined : label} aria-labelledby={labelledBy} aria-describedby={describedBy} onCancel={(event) => { event.preventDefault(); close() }} style={useVisualViewport ? { height: viewport.height, top: viewport.top, bottom: 'auto' } : undefined} className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overflow-hidden border-0 bg-transparent p-0 text-[#111827] backdrop:bg-transparent">
-    <button type="button" tabIndex={-1} aria-label={label + ' 배경 닫기'} onClick={close} className={`absolute inset-0 bg-black/45 transition-opacity duration-200 starting:opacity-0 motion-reduce:transition-none ${closing ? 'opacity-0' : ''}`} />
-    <div ref={sheetRef} data-sheet-panel style={{ height: height ?? viewport.height * initialHeight, maxHeight: viewport.height * 0.95, transitionProperty: dragging ? 'none' : snapPoints ? 'height, translate, opacity' : 'translate, opacity' }} className={`absolute bottom-0 left-1/2 flex w-full max-w-app -translate-x-1/2 flex-col overflow-hidden rounded-t-[28px] bg-white shadow-xl duration-200 starting:translate-y-full starting:opacity-0 motion-reduce:transition-none ${closing ? 'translate-y-full opacity-0' : ''}`}>
+  const Container = modal ? 'dialog' : 'section'
+  return <Container ref={dialogRef} aria-label={labelledBy ? undefined : label} aria-labelledby={labelledBy} aria-describedby={describedBy} onCancel={modal ? (event) => { event.preventDefault(); close() } : undefined} style={useVisualViewport ? { height: viewport.height, top: viewport.top, bottom: 'auto' } : undefined} className={modal ? "fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overflow-hidden border-0 bg-transparent p-0 text-[#111827] backdrop:bg-transparent" : "pointer-events-none absolute inset-0 z-20 overflow-hidden text-[#111827]"}>
+    {modal && <button type="button" tabIndex={-1} aria-label={label + ' 배경 닫기'} onClick={close} className={`absolute inset-0 bg-black/45 transition-opacity duration-200 starting:opacity-0 motion-reduce:transition-none ${closing ? 'opacity-0' : ''}`} />}
+    <div ref={sheetRef} data-sheet-panel style={{ height: height ?? viewport.height * initialHeight, maxHeight: viewport.height * maxHeightRatio, transitionProperty: dragging ? 'none' : snapPoints ? 'height, translate, opacity' : 'translate, opacity' }} className={`pointer-events-auto absolute bottom-0 left-1/2 flex w-full max-w-app -translate-x-1/2 flex-col overflow-hidden rounded-t-[28px] bg-white shadow-xl duration-200 starting:translate-y-full starting:opacity-0 motion-reduce:transition-none ${closing ? 'translate-y-full opacity-0' : ''}`}>
       <div className="shrink-0 touch-none" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={() => { if (dragRef.current) settle() }}>
         <button data-handle type="button" aria-label={label + ' 높이 조절'} onKeyDown={handleKey} className="flex h-6 w-full cursor-grab touch-none items-center justify-center active:cursor-grabbing"><span className="h-1 w-10 rounded-full bg-[#d1d5db]" /></button>
         {typeof header === 'function' ? header(close) : header}
@@ -118,5 +119,5 @@ export default function BottomSheet({ onClose, labelledBy, describedBy, header, 
       <div ref={contentRef} data-sheet-content className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${contentClassName}`} onPointerDown={(event) => { if (event.pointerType === 'mouse' && event.currentTarget.scrollTop === 0) startDrag(event, true) }} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}>{children}</div>
       {typeof footer === 'function' ? footer(close) : footer}
     </div>
-  </dialog>
+  </Container>
 }
