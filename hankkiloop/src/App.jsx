@@ -25,7 +25,8 @@ export default function App() {
   const [screen, setScreen] = useState(() => location.pathname.startsWith('/fridge/') ? 'ingredientDetail' : location.pathname === '/fridge' ? 'fridge' : location.pathname === '/shopping/package-solution' ? 'packageSolution' : location.pathname === '/shopping/register' ? 'register' : location.pathname === '/shopping' ? 'shopping' : location.pathname === '/ai-chat' ? 'aiChat' : location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : 'login')
   const [cartItems, setCartItems] = useState(() => history.state?.cartItems ?? initialCartItems)
   const [registeredMaterials, setRegisteredMaterials] = useState(() => history.state?.registeredMaterials ?? [])
-  const [shoppingFooterHeight, setShoppingFooterHeight] = useState(0)
+  const [isAIChatOpen, setAIChatOpen] = useState(false)
+  const closeAIChat = useCallback(() => { setAIChatOpen(false); requestAnimationFrame(() => document.querySelector('[aria-label="AI 채팅 열기"]')?.focus({ preventScroll: true })) }, [])
   const [chatMessages, setChatMessages] = useState([])
 
   const [inventory, setInventory] = useState(() => history.state?.inventory ?? registerMaterials(createMockInventory(), history.state?.registeredMaterials ?? []))
@@ -68,6 +69,7 @@ export default function App() {
   const [agreeAll, setAgreeAll] = useState(true)
   useEffect(() => {
     const handlePopState = () => {
+      setAIChatOpen(false)
       if (history.state?.account) setAccount(history.state.account)
       if (history.state?.nickname !== undefined) setNickname(history.state.nickname)
       setPreferences(history.state?.preferences)
@@ -98,12 +100,13 @@ export default function App() {
 
   const handleMainNavigate = (path, currentProfile = { account, nickname, preferences, alerts }) => {
     if ((!['/', '/home', '/mypage', '/recipe', '/recipes', '/ai-chat', '/shopping', '/fridge'].includes(path) && !/^\/(recipe|fridge)\/[^/]+$/.test(path)) || path === location.pathname) return
+    setAIChatOpen(false)
     setAccount(currentProfile.account)
     setNickname(currentProfile.nickname)
     setPreferences(currentProfile.preferences)
     setAlerts(currentProfile.alerts)
     history.replaceState({ ...history.state, ...currentProfile, cartItems, registeredMaterials, inventory }, '', location.href)
-    history.pushState({ ...currentProfile, cartItems, registeredMaterials, inventory, fromApp: true, fromFridge: location.pathname === '/fridge', fromRecipe: location.pathname.startsWith('/fridge/') || ['/recipe', '/recipes', '/ai-chat'].includes(location.pathname) }, '', path)
+    history.pushState({ ...currentProfile, cartItems, registeredMaterials, inventory, fromApp: true, fromFridge: location.pathname === '/fridge', fromRecipe: isAIChatOpen || location.pathname.startsWith('/fridge/') || ['/recipe', '/recipes', '/ai-chat'].includes(location.pathname) }, '', path)
     setScreen(path.startsWith('/fridge/') ? 'ingredientDetail' : path === '/fridge' ? 'fridge' : path === '/shopping' ? 'shopping' : path === '/ai-chat' ? 'aiChat' : path.startsWith('/recipe/') ? 'recipeDetail' : path === '/mypage' ? 'mypage' : ['/recipe', '/recipes'].includes(path) ? 'recipe' : 'home')
   }
 
@@ -154,13 +157,14 @@ export default function App() {
   // Main navigation 화면에서만 AI 버튼을 한 번 렌더링합니다.
   const showMainAssistant = ['/', '/home', '/recipe', '/recipes', '/mypage', '/shopping', '/fridge'].includes(location.pathname) && ['home', 'recipe', 'mypage', 'shopping', 'fridge'].includes(screen)
   if (showMainAssistant) return (
-    <div style={{ "--assistant-extra-bottom": screen === "shopping" ? shoppingFooterHeight + "px" : screen === "fridge" ? "84px" : "0px" }} className="relative mx-auto h-dvh w-full max-w-app">
+    <div className="relative mx-auto h-dvh w-full max-w-app">
       {screen === 'fridge' && <Fridge inventory={inventory} registeredMaterials={registeredMaterials} onNavigate={handleMainNavigate} onAdd={handleDirectRegistration} registrationMessage={history.state?.registrationMessage} />}
       {screen === 'home' && <Home onNavigate={handleMainNavigate} />}
       {screen === 'recipe' && <Recipe onNavigate={handleMainNavigate} savedIds={savedIds} onToggleSave={toggleRecipeSave} listState={recipeListState} onListStateChange={setRecipeListState} />}
       {screen === 'mypage' && <MyPage onDraftChange={syncMyPageDraft} onNavigate={handleMainNavigate} onEditProfile={handleEditProfile} initialAlerts={alerts} account={account} nickname={nickname} initialPreferences={preferences} />}
-      {screen === 'shopping' && <Cart items={cartItems} onItemsChange={setCartItems} onOpenPackageSolution={handleOpenPackageSolution} onStartRegistration={handleStartRegistration} registrationMessage={history.state?.registrationMessage} onNavigate={handleMainNavigate} onBack={() => { if (history.state?.fromApp) history.back(); else handleMainNavigate('/') }} onFooterHeight={setShoppingFooterHeight} />}
-      <FloatingAssistant onClick={() => handleMainNavigate('/ai-chat')} />
+      {screen === 'shopping' && <Cart items={cartItems} onItemsChange={setCartItems} onOpenPackageSolution={handleOpenPackageSolution} onStartRegistration={handleStartRegistration} registrationMessage={history.state?.registrationMessage} onNavigate={handleMainNavigate} onBack={() => { if (history.state?.fromApp) history.back(); else handleMainNavigate('/') }} />}
+      <div hidden={isAIChatOpen}><FloatingAssistant onClick={() => setAIChatOpen(true)} /></div>
+      {isAIChatOpen && <AIChat sheet onClose={closeAIChat} onNavigate={handleMainNavigate} messages={chatMessages} onMessagesChange={setChatMessages} />}
     </div>
   )
   if (screen === 'edit') return <EditProfilePage account={account} nickname={nickname} initialPreferences={preferences} onCancel={handleCancelEdit} onSave={handleSaveProfile} />
