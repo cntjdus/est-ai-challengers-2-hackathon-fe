@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 
 // Shared by stock deduction and AI chat. Snapping is opt-in for the chat UX.
-export default function BottomSheet({ onClose, labelledBy, describedBy, header, footer, children, label = '시트', initialHeight = 0.78, snapPoints, closeThreshold = 0.3, contentClassName = '' }) {
+export default function BottomSheet({ onClose, labelledBy, describedBy, header, footer, children, label = '시트', initialHeight = 0.78, snapPoints, closeThreshold = 0.3, contentClassName = '', fitVisualViewport = false }) {
+  const useVisualViewport = fitVisualViewport || Boolean(snapPoints)
   const dialogRef = useRef(null)
   const sheetRef = useRef(null)
   const contentRef = useRef(null)
@@ -12,9 +13,9 @@ export default function BottomSheet({ onClose, labelledBy, describedBy, header, 
   const [height, setHeight] = useState(null)
   const [dragging, setDragging] = useState(false)
   const [closing, setClosing] = useState(false)
-  const [viewport, setViewport] = useState(() => ({ height: snapPoints ? (window.visualViewport?.height ?? innerHeight) : innerHeight, top: snapPoints ? (window.visualViewport?.offsetTop ?? 0) : 0 }))
+  const [viewport, setViewport] = useState(() => ({ height: useVisualViewport ? (window.visualViewport?.height ?? innerHeight) : innerHeight, top: useVisualViewport ? (window.visualViewport?.offsetTop ?? 0) : 0 }))
   const viewportRef = useRef(viewport.height)
-  const updateHeight = (value) => { heightRef.current = value; setHeight(value) }
+  const updateHeight = (value) => { heightRef.current = value; if (!snapPoints) ratioRef.current = value / viewportRef.current; setHeight(value) }
   const close = () => setClosing(true)
   const settle = () => {
     const current = heightRef.current ?? sheetRef.current.offsetHeight
@@ -24,6 +25,7 @@ export default function BottomSheet({ onClose, labelledBy, describedBy, header, 
       ratioRef.current = ratio
       updateHeight(ratio * viewportRef.current)
     }
+    if (!snapPoints) ratioRef.current = current / viewportRef.current
     dragRef.current = null
     setDragging(false)
   }
@@ -40,14 +42,14 @@ export default function BottomSheet({ onClose, labelledBy, describedBy, header, 
     dialog.showModal()
     document.body.style.overflow = 'hidden'
     const resize = () => {
-      const size = snapPoints ? (window.visualViewport?.height ?? innerHeight) : innerHeight
+      const size = useVisualViewport ? (window.visualViewport?.height ?? innerHeight) : innerHeight
       viewportRef.current = size
-      setViewport({ height: size, top: snapPoints ? (window.visualViewport?.offsetTop ?? 0) : 0 })
-      if (snapPoints) { heightRef.current = ratioRef.current * size; setHeight(heightRef.current) }
+      setViewport({ height: size, top: useVisualViewport ? (window.visualViewport?.offsetTop ?? 0) : 0 })
+      if (useVisualViewport) { heightRef.current = ratioRef.current * size; setHeight(heightRef.current) }
       else setHeight((current) => current === null ? null : Math.min(current, size * 0.95))
     }
     window.addEventListener('resize', resize)
-    if (snapPoints) { window.visualViewport?.addEventListener('resize', resize); window.visualViewport?.addEventListener('scroll', resize) }
+    if (useVisualViewport) { window.visualViewport?.addEventListener('resize', resize); window.visualViewport?.addEventListener('scroll', resize) }
     const content = contentRef.current
     let touch = null
     const start = (event) => {
@@ -86,7 +88,7 @@ export default function BottomSheet({ onClose, labelledBy, describedBy, header, 
       content.removeEventListener('touchend', end)
       content.removeEventListener('touchcancel', end)
     }
-  }, [snapPoints])
+  }, [snapPoints, useVisualViewport])
   const startDrag = (event, content = false) => {
     if (!event.isPrimary || event.button !== 0 || event.target.closest('input,textarea,select,a') || (event.target.closest('button') && !event.target.closest('[data-handle]'))) return
     dragRef.current = { id: event.pointerId, y: event.clientY, height: sheetRef.current.offsetHeight, content }
@@ -112,7 +114,7 @@ export default function BottomSheet({ onClose, labelledBy, describedBy, header, 
       updateHeight(ratioRef.current * viewportRef.current)
     } else updateHeight(event.key === 'End' ? viewportRef.current * 0.95 : event.key === 'Home' ? viewportRef.current * 0.4 : Math.max(viewportRef.current * 0.3, Math.min(viewportRef.current * 0.95, sheetRef.current.offsetHeight + (event.key === 'ArrowUp' ? 40 : -40))))
   }
-  return <dialog ref={dialogRef} aria-label={labelledBy ? undefined : label} aria-labelledby={labelledBy} aria-describedby={describedBy} onCancel={(event) => { event.preventDefault(); close() }} style={snapPoints ? { height: viewport.height, top: viewport.top, bottom: 'auto' } : undefined} className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overflow-hidden border-0 bg-transparent p-0 text-[#111827] backdrop:bg-transparent">
+  return <dialog ref={dialogRef} aria-label={labelledBy ? undefined : label} aria-labelledby={labelledBy} aria-describedby={describedBy} onCancel={(event) => { event.preventDefault(); close() }} style={useVisualViewport ? { height: viewport.height, top: viewport.top, bottom: 'auto' } : undefined} className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overflow-hidden border-0 bg-transparent p-0 text-[#111827] backdrop:bg-transparent">
     <button type="button" tabIndex={-1} aria-label={label + ' 배경 닫기'} onClick={close} className={`absolute inset-0 bg-black/45 transition-opacity duration-200 starting:opacity-0 motion-reduce:transition-none ${closing ? 'opacity-0' : ''}`} />
     <div ref={sheetRef} data-sheet-panel style={{ height: height ?? viewport.height * initialHeight, maxHeight: viewport.height * 0.95, transitionProperty: dragging ? 'none' : snapPoints ? 'height, translate, opacity' : 'translate, opacity' }} className={`absolute bottom-0 left-1/2 flex w-full max-w-app -translate-x-1/2 flex-col overflow-hidden rounded-t-[28px] bg-white shadow-xl duration-200 starting:translate-y-full starting:opacity-0 motion-reduce:transition-none ${closing ? 'translate-y-full opacity-0' : ''}`}>
       <div className="shrink-0 touch-none" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={() => { if (dragRef.current) settle() }}>

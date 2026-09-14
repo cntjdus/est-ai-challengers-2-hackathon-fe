@@ -15,11 +15,12 @@ function formatAmount(ingredient, ratio) {
   return Number(value.toFixed(2)) + ingredient.unit
 }
 
-export default function RecipeDetail({ recipeId, savedIds, onToggleSave, onBack, inventory, onDeductStock }) {
+export default function RecipeDetail({ recipeId, savedIds, onToggleSave, onBack, inventory, registeredMaterials, onDeductStock }) {
   const recipe = recipes.find((item) => item.id === recipeId)
   const [servings, setServings] = useState(recipe?.servings ?? 1)
   const [expanded, setExpanded] = useState(false)
   const [added, setAdded] = useState([])
+  const [completionNotice, setCompletionNotice] = useState('')
   const [completed, setCompleted] = useState(false)
   const [isStockSheetOpen, setIsStockSheetOpen] = useState(false)
   const tipRef = useRef(null)
@@ -51,13 +52,13 @@ export default function RecipeDetail({ recipeId, savedIds, onToggleSave, onBack,
         {recipe.substitute && <aside className="mt-6 flex items-center gap-3 rounded-3xl border border-[#bcf5d5] bg-[#effbf4] p-3.5 shadow-xs"><div className="relative size-14 shrink-0 overflow-hidden rounded-2xl border border-[#bbf7d0]"><img src={character} alt="" className="absolute top-[-12%] left-[-2%] w-[255%] max-w-none" /></div><div><h2 className="flex items-center gap-1 text-xs font-bold text-[#148b43]">{recipe.substitute.title}<Sprout aria-hidden="true" className="size-3" /></h2><p className="mt-1 text-sm leading-5 text-[#475569]">{recipe.substitute.description}</p></div></aside>}
         <section className="mt-8"><h2 className="text-xl font-bold">조리 순서</h2><div className="mt-5 space-y-6">{recipe.steps.map((step, index) => <section key={step.step} ref={(element) => { stepRefs.current[index] = element }} tabIndex={-1} className="scroll-mt-5 px-5 outline-none"><div className="flex items-center justify-between"><h3 className="text-xs font-bold text-[#007f5c]">STEP {step.step}</h3>{index < recipe.steps.length - 1 && <button type="button" aria-label={'STEP ' + recipe.steps[index + 1].step + '로 이동'} onClick={() => { stepRefs.current[index + 1]?.scrollIntoView({ behavior: 'smooth', block: 'start' }); stepRefs.current[index + 1]?.focus({ preventScroll: true }) }} className="flex size-8 items-center justify-center text-[#007f5c]"><ArrowRight className="size-5" /></button>}</div><p className="mt-2 text-sm font-semibold leading-6">{step.description}</p>{step.subDescription && <p className="mt-2 text-sm leading-6 text-[#6b7280]">{step.subDescription}</p>}</section>)}</div></section>
         {recipe.tip && <aside ref={tipRef} tabIndex={-1} className="mt-8 flex gap-3 rounded-2xl border border-[#cee3ff] bg-[#eff6ff] p-4 shadow-xs outline-none"><img src={character} alt="" className="size-14 shrink-0 rounded-2xl object-cover" /><div><h2 className="flex flex-wrap items-center gap-2 text-sm font-bold">레시피 팁 <span className="rounded-full bg-[#3982f6] px-2 py-1 text-[10px] text-white">AI BOT</span></h2><p className="mt-1.5 text-sm leading-6 text-[#4b5563]">{recipe.tip}</p></div></aside>}
-        {completed && <p role="status" className="mt-2 text-center text-xs text-[#64748b]">선택한 재료의 재고 차감을 완료했어요.</p>}
+        {completed && <p role="status" className="mt-2 text-center text-xs text-[#64748b]">{completionNotice}</p>}
       </main>
       <footer className="shrink-0 border-t border-[#e5e7eb] bg-white px-4 pt-4 pb-[calc(16px+env(safe-area-inset-bottom))]">
         <button type="button" disabled={completed} onClick={handleCompleteCooking} className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#1b4535] text-base font-bold text-white shadow-lg disabled:bg-[#527466]"><Check aria-hidden="true" className="size-6 text-[#6ee7b7]" />{completed ? '요리 완료했어요' : '요리 완료 (재고 차감)'}</button>
 
       </footer>
-      {isStockSheetOpen && <StockDeductionSheet recipe={recipe} servings={servings} inventory={inventory} onClose={() => setIsStockSheetOpen(false)} onConfirm={(selected) => { onDeductStock(selected); setCompleted(true) }} />}
+      {isStockSheetOpen && <StockDeductionSheet registeredMaterials={registeredMaterials} recipe={recipe} servings={servings} inventory={inventory} onClose={() => setIsStockSheetOpen(false)} onConfirm={(selected, skipped = 0) => { onDeductStock(selected); setCompletionNotice(skipped ? '재고가 확인된 ' + selected.length + '개 재료를 차감했어요. 미확인 ' + skipped + '개는 제외했습니다.' : '선택한 재료의 재고 차감을 완료했어요.'); setCompleted(true) }} />}
     </div>
   )
 }
