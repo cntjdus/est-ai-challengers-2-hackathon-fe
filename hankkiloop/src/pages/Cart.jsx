@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { ArrowLeft, ArrowRight, ListChecks, ShieldCheck, Sparkles } from 'lucide-react'
 import HomeHeader from '../components/home/HomeHeader'
 import BottomNavigation from '../components/common/BottomNavigation'
@@ -7,21 +7,12 @@ import CartItemCard from '../components/cart/CartItemCard'
 import character from '../assets/hankkiloop-character.png'
 import { optimizationCopy } from '../data/cart'
 
-export default function Cart({ items, onItemsChange, onStartRegistration, onOpenPackageSolution, registrationMessage, onNavigate, onBack, onFooterHeight }) {
-  const footerRef = useRef(null)
+export default function Cart({ items, onItemsChange, onStartRegistration, onOpenPackageSolution, registrationMessage, onNavigate, onBack }) {
   const [notice, setNotice] = useState(registrationMessage ?? '')
   const selected = items.filter((item) => item.selected)
   const selectedCount = selected.length
   const allSelected = items.length > 0 && selectedCount === items.length
   const featured = items.find((item) => item.riskLevel === 'warning') ?? items[0]
-  useLayoutEffect(() => {
-    const footer = footerRef.current
-    const update = () => onFooterHeight(footer.getBoundingClientRect().height)
-    update()
-    const observer = new ResizeObserver(update)
-    observer.observe(footer)
-    return () => observer.disconnect()
-  }, [onFooterHeight])
   const handleToggleItem = (id) => onItemsChange((current) => current.map((item) => item.id === id ? { ...item, selected: !item.selected } : item))
   const handleToggleAll = () => onItemsChange((current) => current.map((item) => ({ ...item, selected: !allSelected })))
   const handleQuantityChange = (id, quantity) => {
@@ -45,7 +36,7 @@ export default function Cart({ items, onItemsChange, onStartRegistration, onOpen
       <div className="space-y-4">{items.map((item) => <CartItemCard key={item.id} item={item} onToggle={handleToggleItem} onRemove={handleRemoveItem} onQuantityChange={handleQuantityChange} />)}</div>
       {!items.length && <p className="py-14 text-center text-sm text-[#7c8595]">장바구니가 비어 있어요.</p>}
     </main>
-    <section ref={footerRef} aria-label="장보기 완료" className="shrink-0 bg-white px-5 pt-3 pb-3"><div className="flex items-center gap-3"><div className="shrink-0"><p className="text-[11px] text-[#596a60]">선택 품목</p><p className="mt-1 text-xs"><strong className="mr-1 text-2xl">{selectedCount}</strong>개 담김</p></div><button type="button" disabled={!selectedCount} onClick={handleCompleteShopping} className="ml-auto flex min-h-13 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-[#006c49] px-2 py-2 text-xs font-bold text-white disabled:opacity-40"><ListChecks aria-hidden="true" className="size-4 shrink-0" />장보기 완료하고 냉장고 등록</button></div><p className="mt-2 flex items-start justify-center gap-1 text-[10px] font-semibold leading-4 text-[#596a60]"><ShieldCheck aria-hidden="true" className="size-3.5 shrink-0 text-[#006c49]" />장보기 완료 시 유통기한과 보관장소가 냉장고에 자동 등록됩니다</p></section>
+    <section aria-label="장보기 완료" className="shrink-0 bg-white px-5 pt-3 pb-3"><div className="flex items-center gap-3"><div className="shrink-0"><p className="text-[11px] text-[#596a60]">선택 품목</p><p className="mt-1 text-xs"><strong className="mr-1 text-2xl">{selectedCount}</strong>개 담김</p></div><button type="button" disabled={!selectedCount} onClick={handleCompleteShopping} className="ml-auto flex min-h-13 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-[#006c49] px-2 py-2 text-xs font-bold text-white disabled:opacity-40"><ListChecks aria-hidden="true" className="size-4 shrink-0" />장보기 완료하고 냉장고 등록</button></div><p className="mt-2 flex items-start justify-center gap-1 text-[10px] font-semibold leading-4 text-[#596a60]"><ShieldCheck aria-hidden="true" className="size-3.5 shrink-0 text-[#006c49]" />장보기 완료 시 유통기한과 보관장소가 냉장고에 자동 등록됩니다</p></section>
     <BottomNavigation onNavigate={onNavigate} />
   </div>
 }
