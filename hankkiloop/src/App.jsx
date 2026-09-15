@@ -1,3 +1,4 @@
+import { loadRecipeCatalog, recipeStock } from './data/recipeApi'
 import { createUserHistory } from './auth/navigation'
 import NotificationDrawer from './components/notifications/NotificationDrawer'
 import { NotificationContext } from './components/notifications/NotificationContext'
@@ -73,10 +74,25 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
     document.addEventListener('visibilitychange', refresh)
     return () => { disposed = true; document.removeEventListener('visibilitychange', refresh) }
   }, [reloadInventory])
+  const [catalog, setCatalog] = useState({ recipes: [], foods: [], aliases: [] })
+  const [recipeLoading, setRecipeLoading] = useState(true)
+  const [recipeError, setRecipeError] = useState('')
+  const [recipeReload, setRecipeReload] = useState(0)
+  useEffect(() => {
+    let active = true
+    loadRecipeCatalog(supabase).then(result => {
+      if (active) { setCatalog(result); setRecipeError('') }
+    }).catch(error => {
+      if (active) setRecipeError('레시피를 불러오지 못했어요. ' + error.message)
+    }).finally(() => { if (active) setRecipeLoading(false) })
+    return () => { active = false }
+  }, [recipeReload])
+  const retryRecipes = () => { setRecipeLoading(true); setRecipeReload(n => n + 1) }
+  const recipeInventory = useMemo(() => recipeStock(registeredMaterials, catalog.foods, catalog.aliases), [registeredMaterials, catalog])
   const pendingDeduction = useRef(null)
   const handleStockDeduction = async (selected) => {
     const key = JSON.stringify(selected)
-    if (pendingDeduction.current?.key !== key) pendingDeduction.current = { key, changes: planDeductions(registeredMaterials, selected) }
+    if (pendingDeduction.current?.key !== key) pendingDeduction.current = { key, changes: planDeductions(recipeInventory.registrations, selected) }
     await changeInventoryBatch(supabase, pendingDeduction.current.changes)
     await reloadInventory()
     pendingDeduction.current = null
@@ -97,7 +113,7 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
     pendingRemoval.current = null
     handleMainNavigate('/fridge')
   }
-  const notifications = useMemo(() => [...createExpiryNotifications(buildFridgeItems(inventory, registeredMaterials, notificationNow), notificationNow), ...createMenuNotifications(inventory, notificationNow)].map((item) => ({ ...item, isRead: notificationReadIds.includes(item.id) })), [inventory, registeredMaterials, notificationNow, notificationReadIds])
+  const notifications = useMemo(() => [...createExpiryNotifications(buildFridgeItems(inventory, registeredMaterials, notificationNow), notificationNow), ...createMenuNotifications(recipeInventory.inventory, notificationNow, catalog.recipes)].map((item) => ({ ...item, isRead: notificationReadIds.includes(item.id) })), [inventory, registeredMaterials, notificationNow, notificationReadIds, catalog.recipes, recipeInventory.inventory])
   const handleMarkRead = (id) => setNotificationReadIds((ids) => markNotificationAsRead(ids, id))
   const handleMarkAllRead = () => setNotificationReadIds((ids) => markAllNotificationsAsRead(ids, notifications))
   useEffect(() => { history.replaceState({ ...history.readState(), inventory, registeredMaterials, cartItems }, '', location.href) }, [inventory, registeredMaterials, cartItems, screen, history])
@@ -223,19 +239,20 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
     } else handleMainNavigate(action.type === 'recipe' ? '/recipe/' + action.recipeId : '/fridge')
   }
   const renderScreen = () => {
-  if (screen === 'ingredientDetail') return <IngredientDetail onUpdate={handleUpdateItem} onRemove={handleRemoveItem} key={location.pathname} itemId={location.pathname.slice('/fridge/'.length)} inventory={inventory} registeredMaterials={registeredMaterials} onNavigate={handleMainNavigate} onBack={() => { if (history.readState()?.fromFridge) history.back(); else handleMainNavigate('/fridge') }} onBrowseRecipes={(name) => { setRecipeListState({ tab: 'recipes', category: 'AI 추천 메뉴', query: name, search: name }); handleMainNavigate('/recipe') }} />
+  if (screen === 'ingredientDetail') return <IngredientDetail recipes={catalog.recipes} onUpdate={handleUpdateItem} onRemove={handleRemoveItem} key={location.pathname} itemId={location.pathname.slice('/fridge/'.length)} inventory={inventory} registeredMaterials={registeredMaterials} onNavigate={handleMainNavigate} onBack={() => { if (history.readState()?.fromFridge) history.back(); else handleMainNavigate('/fridge') }} onBrowseRecipes={(name) => { setRecipeListState({ tab: 'recipes', category: 'AI 추천 메뉴', query: name, search: name }); handleMainNavigate('/recipe') }} />
   if (screen === 'packageMap') return <Suspense fallback={<div role="status" className="mx-auto flex h-dvh max-w-app items-center justify-center bg-white text-sm text-[#007451]">지도를 불러오는 중…</div>}><PackageMap key={history.readState()?.solutionId ?? 'empty'} item={cartItems.find((item) => item.id === history.readState()?.packageItemId)} selectedProductId={history.readState()?.packageView?.selectedProductId} onBack={handleClosePackageMap} onReplace={handleReplaceCartItem} /></Suspense>
   if (screen === 'packageSolution') return <PackageSolution key={history.readState()?.solutionId ?? 'empty'} item={cartItems.find((item) => item.id === history.readState()?.packageItemId)} onBack={() => { if (history.readState()?.fromShopping) history.back(); else handleMainNavigate('/shopping') }} onClose={() => { if (history.readState()?.fromRegistration) history.back(); else handleMainNavigate('/shopping') }} onOpenMap={handleOpenPackageMap} onReplace={handleReplaceCartItem} />
   if (screen === 'register') return <MaterialRegister key={history.readState()?.registrationId ?? 'empty'} source={history.readState()?.source} items={history.readState()?.registrationItems ?? []} onNavigate={handleMainNavigate} onBack={() => { if (history.readState()?.fromShopping || history.readState()?.source === 'fridge-direct') history.back(); else handleMainNavigate('/shopping') }} onRegister={handleRegisterToFridge} onOpenPackageSolution={handleOpenPackageSolution} />
-  if (screen === 'recipeDetail') return <RecipeDetail registeredMaterials={registeredMaterials} inventory={inventory} onDeductStock={handleStockDeduction} key={location.pathname} recipeId={location.pathname.slice('/recipe/'.length)} savedIds={savedIds} onToggleSave={toggleRecipeSave} onBack={() => { if (history.readState()?.fromRecipe) history.back(); else handleMainNavigate('/recipe') }} />
+  if (screen === 'recipeDetail' && (recipeLoading || recipeError)) return <div className="mx-auto max-w-app p-8"><p role={recipeError ? 'alert' : 'status'}>{recipeLoading ? '레시피를 불러오는 중…' : recipeError}</p>{!recipeLoading && <button onClick={retryRecipes}>다시 불러오기</button>}<button onClick={() => handleMainNavigate('/recipe')}>레시피 목록으로</button></div>
+  if (screen === 'recipeDetail') return <RecipeDetail recipes={catalog.recipes} registeredMaterials={recipeInventory.registrations} inventory={recipeInventory.inventory} onDeductStock={handleStockDeduction} key={location.pathname} recipeId={location.pathname.slice('/recipe/'.length)} savedIds={savedIds} onToggleSave={toggleRecipeSave} onBack={() => { if (history.readState()?.fromRecipe) history.back(); else handleMainNavigate('/recipe') }} />
   if (screen === 'aiChat') return <AIChat onNavigate={handleMainNavigate} messages={chatMessages} onMessagesChange={setChatMessages} />
   // Main navigation 화면에서만 AI 버튼을 한 번 렌더링합니다.
   const showMainAssistant = ['/', '/home', '/recipe', '/recipes', '/mypage', '/shopping', '/fridge'].includes(location.pathname) && ['home', 'recipe', 'mypage', 'shopping', 'fridge'].includes(screen)
   if (showMainAssistant) return (
     <div className="relative mx-auto h-dvh w-full max-w-app">
       {screen === 'fridge' && <Fridge inventory={inventory} registeredMaterials={registeredMaterials} onNavigate={handleMainNavigate} onAdd={handleDirectRegistration} registrationMessage={history.readState()?.registrationMessage} />}
-      {screen === 'home' && <Home fridgeItems={buildFridgeItems(inventory, registeredMaterials)} nickname={nickname} onNavigate={handleMainNavigate} />}
-      {screen === 'recipe' && <Recipe key={recipeSearchKey} onNavigate={handleMainNavigate} savedIds={savedIds} onToggleSave={toggleRecipeSave} listState={recipeListState} onListStateChange={setRecipeListState} />}
+      {screen === 'home' && <Home recommendedRecipes={catalog.recipes.slice(0, 3)} recipeLoading={recipeLoading} recipeError={recipeError} onRetryRecipes={retryRecipes} fridgeItems={buildFridgeItems(inventory, registeredMaterials)} nickname={nickname} onNavigate={handleMainNavigate} />}
+      {screen === 'recipe' && <Recipe recipes={catalog.recipes} loading={recipeLoading} error={recipeError} onRetry={retryRecipes} key={recipeSearchKey} onNavigate={handleMainNavigate} savedIds={savedIds} onToggleSave={toggleRecipeSave} listState={recipeListState} onListStateChange={setRecipeListState} />}
       {screen === 'mypage' && <MyPage onSaveSettings={handleSaveSettings} onSignOut={onSignOut} onNavigate={handleMainNavigate} onEditProfile={handleEditProfile} initialAlerts={alerts} account={account} nickname={nickname} initialPreferences={preferences} />}
       {screen === 'shopping' && <Cart items={cartItems} onItemsChange={setCartItems} onOpenPackageSolution={handleOpenPackageSolution} onStartRegistration={handleStartRegistration} registrationMessage={history.readState()?.registrationMessage} onNavigate={handleMainNavigate} onBack={() => { if (history.readState()?.fromApp) history.back(); else handleMainNavigate('/') }} />}
       <div hidden={isAIChatOpen || isNotificationOpen}><FloatingAssistant onClick={() => { setNotificationOpen(false); setAIChatOpen(true) }} /></div>
@@ -244,7 +261,7 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
   )
   if (screen === 'edit') return <EditProfilePage account={account} nickname={nickname} initialPreferences={preferences} onCancel={handleCancelEdit} onSave={handleSaveProfile} />
 
-  return <Home fridgeItems={buildFridgeItems(inventory, registeredMaterials)} nickname={nickname} onNavigate={handleMainNavigate} />
+  return <Home recommendedRecipes={catalog.recipes.slice(0, 3)} recipeLoading={recipeLoading} recipeError={recipeError} onRetryRecipes={retryRecipes} fridgeItems={buildFridgeItems(inventory, registeredMaterials)} nickname={nickname} onNavigate={handleMainNavigate} />
   }
   return <NotificationContext.Provider value={{ open: openNotifications, isOpen: isNotificationOpen, unreadCount: notifications.filter((item) => !item.isRead).length }}>
     {inventoryLoading ? <div role="status" className="mx-auto max-w-app p-10 text-center">냉장고 정보를 불러오는 중…</div> : inventoryError && !inventoryReady ? <div role="alert" className="mx-auto max-w-app p-8"><p>{inventoryError}</p><button type="button" onClick={() => reloadInventory().catch(() => {})} className="mt-4 rounded-xl bg-[#006c49] px-5 py-3 text-white">다시 불러오기</button></div> : renderScreen()}

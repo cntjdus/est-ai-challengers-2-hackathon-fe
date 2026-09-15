@@ -4,11 +4,11 @@ import EditProfileHeader from '../components/profile/EditProfileHeader'
 import BottomNavigation from '../components/common/BottomNavigation'
 import RecipeCard from '../components/recipe/RecipeCard'
 import { buildFridgeItems, expiryLabel, storageLabels, statusVariants } from '../data/inventory'
-import { recipes } from '../data/recipes'
+
 import character from '../assets/hankkiloop-character.png'
 
 const storageIcons = { fridge: Refrigerator, freezer: Snowflake, room: Sun }
-export default function IngredientDetail({ itemId, inventory, registeredMaterials, onBack, onNavigate, onBrowseRecipes, onUpdate, onRemove }) {
+export default function IngredientDetail({ recipes = [], itemId, inventory, registeredMaterials, onBack, onNavigate, onBrowseRecipes, onUpdate, onRemove }) {
   const [amountNotice, setAmountNotice] = useState(false)
   const item = buildFridgeItems(inventory, registeredMaterials).find((entry) => entry.id === itemId)
   const [draft, setDraft] = useState(null)
@@ -31,7 +31,7 @@ export default function IngredientDetail({ itemId, inventory, registeredMaterial
     <main className="min-h-0 flex-1 overflow-y-auto px-5 py-12 text-center"><h2 className="text-base">식재료 정보를 찾을 수 없습니다.</h2><p className="mt-2 text-xs text-[#7c8595]">재료가 모두 소진되었거나 등록되지 않은 주소예요.</p><button type="button" onClick={() => onNavigate('/fridge')} className="mt-6 rounded-xl bg-[#006c49] px-5 py-3 text-sm text-white">냉장고로 돌아가기</button></main><BottomNavigation onNavigate={onNavigate} />
   </div>
   const StorageIcon = storageIcons[item.storageType] ?? Refrigerator
-  const recommended = item.recommendedRecipeIds.map((id) => recipes.find((recipe) => recipe.id === id)).filter(Boolean)
+  const recommended = recipes.filter(recipe => recipe.ingredients.some(ingredient => ingredient.name === item.name && ingredient.unit === item.unit))
   const purchase = !item.purchaseDate ? '날짜 미등록' : new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric' }).format(new Date(item.purchaseDate + 'T12:00:00'))
   return <div className="mx-auto flex h-dvh w-full max-w-app flex-col overflow-hidden bg-[#f8f9ff] text-[#1e293b]">
     <div className="shrink-0 bg-white"><EditProfileHeader title="식재료 상세" align="left" dot plain onBack={onBack} /></div>
@@ -64,7 +64,7 @@ export default function IngredientDetail({ itemId, inventory, registeredMaterial
         <p className="mt-4 rounded-2xl bg-white p-3 text-sm">{item.expiryDate ? '등록한 소비기한: ' + item.expiryDate + ' · ' + expiryLabel(item.daysLeft) : '소비기한이 등록되지 않았어요.'}</p>
         <div className="relative mt-3 rounded-2xl border border-[#a7f3d0]/70 bg-white p-3 text-xs leading-5 text-[#475467] before:absolute before:-top-1.5 before:left-6 before:size-3 before:rotate-45 before:border-t before:border-l before:border-[#a7f3d0]/70 before:bg-white"><p>{item.storageTip}</p></div>
       </section>
-      <section aria-label="소진 추천 레시피" className="pt-1"><div className="mb-3 flex items-center justify-between gap-2"><h2 className="min-w-0 break-words text-sm">{item.name} 소진 추천 레시피</h2><span className="shrink-0 rounded-full bg-[#ecfdf5] px-2 py-1 text-[9px] text-[#008768]">소진 우선순위</span></div><div className="space-y-2">{recommended.slice(0, 2).map((recipe) => { const used = recipe.ingredients.find((entry) => entry.id === item.ingredientId); return <RecipeCard key={recipe.id} recipe={recipe} compact usage={used ? used.name + ' ' + Number((used.quantity * (used.unit === item.unit ? 1 : item.displayPerUnit)).toFixed(2)) + item.unit + ' 소진' : ''} onOpen={() => onNavigate('/recipe/' + recipe.id)} /> })}{!recommended.length && <p className="rounded-2xl border border-[#d1fae5] bg-white p-5 text-center text-xs text-[#8792a2]">아직 연결된 추천 레시피가 없어요.</p>}</div></section>
+      <section aria-label="소진 추천 레시피" className="pt-1"><div className="mb-3 flex items-center justify-between gap-2"><h2 className="min-w-0 break-words text-sm">{item.name} 소진 추천 레시피</h2><span className="shrink-0 rounded-full bg-[#ecfdf5] px-2 py-1 text-[9px] text-[#008768]">소진 우선순위</span></div><div className="space-y-2">{recommended.slice(0, 2).map((recipe) => { const used = recipe.ingredients.find((entry) => entry.name === item.name && entry.unit === item.unit); return <RecipeCard key={recipe.id} recipe={recipe} compact usage={used ? used.name + ' ' + Number((used.quantity * (used.unit === item.unit ? 1 : item.displayPerUnit)).toFixed(2)) + item.unit + ' 소진' : ''} onOpen={() => onNavigate('/recipe/' + recipe.id)} /> })}{!recommended.length && <p className="rounded-2xl border border-[#d1fae5] bg-white p-5 text-center text-xs text-[#8792a2]">아직 연결된 추천 레시피가 없어요.</p>}</div></section>
       <button type="button" onClick={() => onBrowseRecipes(item.name)} className="flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl bg-[#006c49] px-3 py-3 text-sm text-white shadow-lg">이 재료 활용 레시피 보러가기<ArrowRight aria-hidden="true" className="size-4" /></button>
     </main>
     <BottomNavigation onNavigate={onNavigate} />

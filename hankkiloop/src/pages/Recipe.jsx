@@ -1,12 +1,12 @@
-import { recipes, sortRecipesByLatest } from '../data/recipes'
+import { sortRecipesByLatest } from '../data/recipes'
 import { useEffect, useRef, useState } from 'react'
 import HomeHeader from '../components/home/HomeHeader'
 import BottomNavigation from '../components/common/BottomNavigation'
 import RecipeCard from '../components/recipe/RecipeCard'
 import character from '../assets/hankkiloop-character.png'
 
-// TODO: 레시피 API 및 Figma 원본 음식 사진 연결
-export default function Recipe({ onNavigate, savedIds, onToggleSave, listState, onListStateChange }) {
+// Database catalog is supplied by App.
+export default function Recipe({ recipes = [], loading = false, error = '', onRetry, onNavigate, savedIds, onToggleSave, listState, onListStateChange }) {
   const [tab, setTab] = useState(listState.tab ?? 'recipes')
   const [search, setSearch] = useState(listState.search ?? '')
   useEffect(() => { onListStateChange({ tab, search }) }, [tab, search, onListStateChange])
@@ -28,7 +28,7 @@ export default function Recipe({ onNavigate, savedIds, onToggleSave, listState, 
           <button type="button" aria-pressed={tab === 'recipes'} onClick={() => { setTab('recipes'); setSearch('') }} className="border-b-[3px] border-transparent py-3 text-base text-[#839087] aria-pressed:border-[#007f5c] aria-pressed:text-[#007f5c]">레시피{tab === 'recipes' && <span className="ml-1 text-[#10b981]">•</span>}</button>
           <button type="button" aria-pressed={tab === 'saved'} onClick={() => setTab('saved')} className="border-b-[3px] border-transparent py-3 text-base text-[#839087] aria-pressed:border-[#007f5c] aria-pressed:text-[#007f5c]">스크랩 <span className="rounded-full bg-[#e9eefb] px-1.5 text-xs">{savedIds.length}</span></button>
         </div>
-        <section className="mt-7"><div className="mb-3 flex items-center justify-between gap-1"><h2 className="text-base text-[#1e293b]">{tab === 'saved' ? '스크랩한 레시피' : search ? search + ' 활용 레시피' : '냉장고 맞춤 추천 레시피'}<span className="ml-1 rounded-full bg-[#006c49] px-2 text-[11px] text-white">{visibleRecipes.length}선</span></h2><span className="shrink-0 text-[10px] text-[#839087]">최신순</span></div><div className="flex flex-col gap-3">{visibleRecipes.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} onOpen={() => { onListStateChange({ tab, search }); onNavigate('/recipe/' + recipe.id) }} saved={savedIds.includes(recipe.id)} onToggleSave={() => onToggleSave(recipe.id)} />)}{visibleRecipes.length === 0 && <p role="status" className="rounded-2xl bg-white px-4 py-8 text-center text-sm text-[#64748b]">{tab === 'saved' ? '스크랩한 레시피가 없습니다.' : '검색 조건에 맞는 레시피가 없습니다.'}</p>}</div></section>
+        <section className="mt-7"><div className="mb-3 flex items-center justify-between gap-1"><h2 className="text-base text-[#1e293b]">{tab === 'saved' ? '스크랩한 레시피' : search ? search + ' 활용 레시피' : '둘러볼 레시피'}<span className="ml-1 rounded-full bg-[#006c49] px-2 text-[11px] text-white">{visibleRecipes.length}선</span></h2><span className="shrink-0 text-[10px] text-[#839087]">최신순</span></div><div className="flex flex-col gap-3">{loading && <p role="status">레시피를 불러오는 중…</p>}{!loading && error && <div role="alert"><p>{error}</p><button onClick={onRetry}>다시 불러오기</button></div>}{!loading && !error && visibleRecipes.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} onOpen={() => { onListStateChange({ tab, search }); onNavigate('/recipe/' + recipe.id) }} saved={savedIds.includes(recipe.id)} onToggleSave={() => onToggleSave(recipe.id)} />)}{!loading && !error && visibleRecipes.length === 0 && <p role="status" className="rounded-2xl bg-white px-4 py-8 text-center text-sm text-[#64748b]">{tab === 'saved' ? '스크랩한 레시피가 없습니다.' : recipes.length ? '검색 조건에 맞는 레시피가 없습니다.' : '아직 등록된 레시피가 없습니다.'}</p>}</div></section>
       </main>
       <BottomNavigation onNavigate={onNavigate} />
     </div>

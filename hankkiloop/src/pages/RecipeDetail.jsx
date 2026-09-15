@@ -2,7 +2,7 @@ import StockDeductionSheet from '../components/recipe/StockDeductionSheet'
 import { useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, Bookmark, Check, Minus, Plus, Sprout } from 'lucide-react'
 import EditProfileHeader from '../components/profile/EditProfileHeader'
-import { recipes } from '../data/recipes'
+import { compareIngredient } from '../data/recipeApi'
 import character from '../assets/hankkiloop-character.png'
 
 function formatAmount(ingredient, ratio) {
@@ -15,11 +15,10 @@ function formatAmount(ingredient, ratio) {
   return Number(value.toFixed(2)) + ingredient.unit
 }
 
-export default function RecipeDetail({ recipeId, savedIds, onToggleSave, onBack, inventory, registeredMaterials, onDeductStock }) {
+export default function RecipeDetail({ recipes = [], recipeId, savedIds, onToggleSave, onBack, inventory, registeredMaterials, onDeductStock }) {
   const recipe = recipes.find((item) => item.id === recipeId)
   const [servings, setServings] = useState(recipe?.servings ?? 1)
   const [expanded, setExpanded] = useState(false)
-  const [added, setAdded] = useState([])
   const [completionNotice, setCompletionNotice] = useState('')
   const [completed, setCompleted] = useState(false)
   const [isStockSheetOpen, setIsStockSheetOpen] = useState(false)
@@ -40,18 +39,18 @@ export default function RecipeDetail({ recipeId, savedIds, onToggleSave, onBack,
         <dl className="mt-6 grid grid-cols-3 rounded-2xl border border-[#e2ebe5] bg-[#f3f7f5] py-4 text-center">
           {[['인분', servings + '인분'], ['조리', '약 ' + recipe.minutes + '분'], ['난이도', recipe.difficulty]].map(([label, value]) => <div key={label} className="border-r border-[#e5e7eb] last:border-0"><dt className="text-xs text-[#7c8595]">{label}</dt><dd className="mt-1 text-base font-bold">{value}</dd></div>)}
         </dl>
-        <section className="mt-6 border-b border-[#f0f2f3] pb-6"><h2 className="text-lg font-bold">조리 도구</h2><p className="mt-2 text-sm">{recipe.tools.join(' · ')}</p></section>
+        <section className="mt-6 border-b border-[#f0f2f3] pb-6"><h2 className="text-lg font-bold">조리 도구</h2><p className="mt-2 text-sm">{recipe.tools.join(' · ') || '등록된 조리 도구가 없습니다.'}</p></section>
         <section className="mt-2">
-          <div className="flex items-center justify-between gap-2"><h2 className="text-lg font-bold">재료</h2><div className="flex items-center gap-2 rounded-xl border border-[#e5e7eb] bg-[#f4f5f5] p-1 text-sm"><button type="button" aria-label="인분 줄이기" disabled={servings === 1 || completed} onClick={() => setServings(servings - 1)} className="flex size-7 items-center justify-center rounded-lg bg-white shadow-xs disabled:opacity-40"><Minus className="size-3" /></button><output aria-label="인분" className="min-w-4 text-center font-bold">{servings}</output><button type="button" aria-label="인분 늘리기" disabled={completed} onClick={() => setServings(servings + 1)} className="flex size-7 items-center justify-center rounded-lg bg-white shadow-xs disabled:opacity-40"><Plus className="size-3" /></button><span className="pr-1 text-xs text-[#7c8595]">인분</span></div></div>
-          <ul className="mt-3">{recipe.ingredients.map((source) => { const ingredient = { ...source, inFridge: (inventory[source.id] ?? 0) > 0 }; return <li key={ingredient.id} className={`flex min-h-13 items-center gap-2 border-b border-[#f0f2f3] py-2 text-sm ${ingredient.inFridge ? 'my-2 rounded-lg bg-[#f0fbf6] px-2' : ''}`}>
+          <div className="flex items-center justify-between gap-2"><h2 className="text-lg font-bold">재료</h2><div className="flex items-center gap-2 rounded-xl border border-[#e5e7eb] bg-[#f4f5f5] p-1 text-sm"><button type="button" aria-label="인분 줄이기" disabled={servings <= 1 || completed} onClick={() => setServings(Math.max(1, servings - 1))} className="flex size-7 items-center justify-center rounded-lg bg-white shadow-xs disabled:opacity-40"><Minus className="size-3" /></button><output aria-label="인분" className="min-w-4 text-center font-bold">{servings}</output><button type="button" aria-label="인분 늘리기" disabled={completed} onClick={() => setServings(servings + 1)} className="flex size-7 items-center justify-center rounded-lg bg-white shadow-xs disabled:opacity-40"><Plus className="size-3" /></button><span className="pr-1 text-xs text-[#7c8595]">인분</span></div></div>
+          <ul className="mt-3">{recipe.ingredients.map((source) => { const comparison = compareIngredient(source, servings, recipe.servings, inventory); const ingredient = { ...source, inFridge: comparison.available > 0 }; return <li key={ingredient.id} className={`flex min-h-13 items-center gap-2 border-b border-[#f0f2f3] py-2 text-sm ${ingredient.inFridge ? 'my-2 rounded-lg bg-[#f0fbf6] px-2' : ''}`}>
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5"><span>{ingredient.name}</span>{ingredient.inFridge && ingredient.storageLabel && <span className="rounded bg-[#d9faeb] px-1.5 py-1 text-[10px] font-semibold text-[#008768]">{ingredient.storageLabel}</span>}</div>
-            <span className="shrink-0 text-[#7c8595]">{formatAmount(ingredient, servings / recipe.servings)}</span>
-            {ingredient.inFridge ? <span className="min-w-12 rounded-full bg-[#e0f7ec] px-2 py-1 text-center text-xs font-semibold text-[#008768]">있음</span> : <button type="button" aria-label={ingredient.name + ' 담기'} aria-pressed={added.includes(ingredient.name)} onClick={() => setAdded((current) => current.includes(ingredient.name) ? current.filter((name) => name !== ingredient.name) : [...current, ingredient.name])} className="min-w-14 shrink-0 rounded-full border border-[#3478ff] px-2 py-1 text-xs font-semibold text-[#3478ff] aria-pressed:bg-[#eaf2ff]">{added.includes(ingredient.name) ? '담김' : '담기 +'}</button>}
+            <span className="shrink-0 text-[#7c8595]">필요 {formatAmount(ingredient, servings / recipe.servings)}</span>
+            <span className="text-right text-xs text-[#008768]">보유 {comparison.available}{ingredient.unit}<br />{comparison.shortage > 0 ? '부족 ' + comparison.shortage + ingredient.unit : '충분'}{comparison.differentUnit && <span className="block text-amber-700">다른 단위 재고는 환산 확인 필요</span>}{ingredient.optional && <span className="block">선택 재료</span>}</span>
           </li> })}</ul>
         </section>
         {recipe.substitute && <aside className="mt-6 flex items-center gap-3 rounded-3xl border border-[#bcf5d5] bg-[#effbf4] p-3.5 shadow-xs"><div className="relative size-14 shrink-0 overflow-hidden rounded-2xl border border-[#bbf7d0]"><img src={character} alt="" className="absolute top-[-12%] left-[-2%] w-[255%] max-w-none" /></div><div><h2 className="flex items-center gap-1 text-xs font-bold text-[#148b43]">{recipe.substitute.title}<Sprout aria-hidden="true" className="size-3" /></h2><p className="mt-1 text-sm leading-5 text-[#475569]">{recipe.substitute.description}</p></div></aside>}
         <section aria-label="조리 순서" className="mt-8"><h2 className="text-xl font-bold">조리 순서</h2>
-          {recipe.steps.length > 0 && <div className="mt-5 px-5">
+          {recipe.steps.length === 0 && <p className="mt-3 text-sm">등록된 조리 순서가 없습니다.</p>}{recipe.steps.length > 0 && <div className="mt-5 px-5">
             <div className="flex items-center justify-between gap-2"><h3 className="text-xs font-bold text-[#007f5c]">STEP {recipe.steps[activeStep].step}</h3><div className="flex items-center gap-1"><span className="mr-1 text-xs text-[#7c8595]">{activeStep + 1} / {recipe.steps.length}</span><button type="button" aria-label="이전 조리 단계" disabled={activeStep === 0} onClick={() => setActiveStep((step) => Math.max(0, step - 1))} className="flex size-9 items-center justify-center rounded-full text-[#007f5c] hover:bg-[#e0f7ec] disabled:cursor-default disabled:opacity-25"><ArrowLeft aria-hidden="true" className="size-5" /></button><button type="button" aria-label="다음 조리 단계" disabled={activeStep === recipe.steps.length - 1} onClick={() => setActiveStep((step) => Math.min(recipe.steps.length - 1, step + 1))} className="flex size-9 items-center justify-center rounded-full text-[#007f5c] hover:bg-[#e0f7ec] disabled:cursor-default disabled:opacity-25"><ArrowRight aria-hidden="true" className="size-5" /></button></div></div>
             <div className="overflow-hidden" aria-live="polite" aria-atomic="true"><div className="flex transition-transform duration-300 ease-out motion-reduce:transition-none" style={{ transform: 'translateX(-' + activeStep * 100 + '%)' }}>{recipe.steps.map((step, index) => <div key={step.step} aria-hidden={index !== activeStep} inert={index !== activeStep} className="w-full min-w-full shrink-0"><p className="mt-2 text-sm font-semibold leading-6">{step.description}</p>{step.subDescription && <p className="mt-2 text-sm leading-6 text-[#6b7280]">{step.subDescription}</p>}</div>)}</div></div>
           </div>}

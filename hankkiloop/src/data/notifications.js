@@ -1,5 +1,4 @@
 import { getDaysUntilExpiry, expiryLabel } from './inventory'
-import { recipes } from './recipes'
 
 export function getNotificationCategoryByDaysLeft(daysLeft) {
   if (!Number.isFinite(daysLeft)) return null
@@ -24,10 +23,10 @@ export function createExpiryNotifications(fridgeItems, now = new Date()) {
     }]
   })
 }
-export function createMenuNotifications(inventory, now = new Date()) {
+export function createMenuNotifications(inventory, now = new Date(), recipes = []) {
   // Demo recommendation references; recipe titles and quantities stay in the existing recipe data.
-  return ['tofu', 'stew'].flatMap((id, index) => {
-    const recipe = recipes.find((item) => item.id === id)
+  return recipes.slice(0, 2).flatMap((recipe, index) => {
+    const id = recipe.id
     if (!recipe) return []
     return [{
       id: 'menu:' + id + ':' + now.toLocaleDateString('en-CA'),

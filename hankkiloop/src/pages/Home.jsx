@@ -5,12 +5,12 @@ import HomeRecipeCard from '../components/home/HomeRecipeCard'
 import BottomNavigation from '../components/common/BottomNavigation'
 import character from '../assets/hankkiloop-character.png'
 import { expiryLabel, storageLabels } from '../data/inventory'
-import { recipes, sortRecipesByLatest } from '../data/recipes'
+
 
 // API 연결 시 동일한 레시피 형식의 추천 목록을 recommendedRecipes로 전달합니다.
-const defaultRecommendedRecipes = sortRecipesByLatest(recipes).slice(0, 1)
 
-export default function Home({ onNavigate, fridgeItems = [], nickname = '', recommendedRecipes = defaultRecommendedRecipes }) {
+
+export default function Home({ onNavigate, fridgeItems = [], nickname = '', recommendedRecipes = [], recipeLoading = false, recipeError = '', onRetryRecipes }) {
   const urgent = fridgeItems.filter(i => i.daysLeft !== null && i.daysLeft <= 2).sort((a,b) => a.daysLeft-b.daysLeft)
   const first = urgent[0]
   const pageRef = useRef(null)
@@ -40,7 +40,7 @@ export default function Home({ onNavigate, fridgeItems = [], nickname = '', reco
             <div className="rounded-2xl border border-[#e5ece7] bg-white p-3.5 shadow-xs"><div className="flex items-center justify-between gap-1"><h3 className="text-xs text-[#ea580c]">소비 임박 알림</h3><span aria-hidden="true" className="flex size-7 items-center justify-center rounded-full bg-[#fffbeb] text-sm text-[#f59e0b]"><TriangleAlert aria-hidden="true" className="size-4" /></span></div><p className="mt-2 text-base text-[#c66b43]">{urgent.length ? urgent.map(i => i.name).join(', ') : '임박 재료 없음'}</p><p className="mt-1 text-[10px] text-[#94a3b8]">{urgent.length}개 재료 · 기한 경과 포함</p></div>
           </div>
         </section>
-        <section className="mt-7"><h2 className="mb-3 flex items-center gap-2 px-1 text-sm text-[#1e293b]"><CookingPot aria-hidden="true" className="size-4 text-[#ea8000]" />둘러볼 레시피 (예시)</h2><div className="space-y-3">{recommendedRecipes.map((recipe) => <HomeRecipeCard key={recipe.id} recipe={recipe} onOpen={(id) => onNavigate(`/recipe/${encodeURIComponent(id)}`)} />)}</div></section>
+        <section className="mt-7"><h2 className="mb-3 flex items-center gap-2 px-1 text-sm text-[#1e293b]"><CookingPot aria-hidden="true" className="size-4 text-[#ea8000]" />둘러볼 레시피</h2><div className="space-y-3">{recipeLoading && <p role="status">레시피를 불러오는 중…</p>}{!recipeLoading && recipeError && <div role="alert"><p>{recipeError}</p><button onClick={onRetryRecipes}>다시 불러오기</button></div>}{!recipeLoading && !recipeError && recommendedRecipes.length === 0 && <p>아직 등록된 레시피가 없습니다.</p>}{!recipeLoading && !recipeError && recommendedRecipes.map((recipe) => <HomeRecipeCard key={recipe.id} recipe={recipe} onOpen={(id) => onNavigate(`/recipe/${encodeURIComponent(id)}`)} />)}</div></section>
         <aside className="mt-4 flex items-center gap-3 rounded-2xl border border-[#d1fae5] bg-[#ecfdf5]/70 p-3.5"><span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-[#a7f3d0]/70 bg-white"><Lightbulb aria-hidden="true" className="size-5 text-[#008b65]" /></span><p className="text-xs leading-[17px] text-[#334155]">대파는 송송 썰어 냉동실에 보관하면<br /><span className="text-[11px] text-[#94a3b8]">최대 한 달 동안 향긋하고 신선하게 쓸 수 있어요.</span></p></aside>
       </main>
       <BottomNavigation onNavigate={onNavigate} />
