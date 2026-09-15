@@ -8,12 +8,13 @@ import PackageSolution from './pages/PackageSolution'
 
 import { getPackageOptions, replaceCartItem } from './data/packageOptions'
 import MaterialRegister from './pages/MaterialRegister'
-import { registerMaterials } from './data/materialRegistration'
+import { supabase } from './lib/supabase'
+import { loadInventory, registerInventory, toRegistrationPayload, saveInventoryItem, planDeductions, changeInventoryBatch } from './data/fridgeApi'
 import Cart from './pages/Cart'
 import { initialCartItems } from './data/cart'
 import AIChat from './pages/AIChat'
 import FloatingAssistant from './components/common/FloatingAssistant'
-import { buildFridgeItems, createMockInventory, deductInventory } from './data/inventory'
+import { buildFridgeItems } from './data/inventory'
 import RecipeDetail from './pages/RecipeDetail'
 import Recipe from './pages/Recipe'
 import Home from './pages/Home'
@@ -27,7 +28,7 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
   const history = useMemo(() => createUserHistory(initialProfile.account.id), [initialProfile.account.id])
   const [screen, setScreen] = useState(() => location.pathname.startsWith('/fridge/') ? 'ingredientDetail' : location.pathname === '/fridge' ? 'fridge' : location.pathname === '/shopping/package-solution/map' ? 'packageMap' : location.pathname === '/shopping/package-solution' ? 'packageSolution' : location.pathname === '/shopping/register' ? 'register' : location.pathname === '/shopping' ? 'shopping' : location.pathname === '/ai-chat' ? 'aiChat' : location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : 'login')
   const [cartItems, setCartItems] = useState(() => history.readState()?.cartItems ?? initialCartItems)
-  const [registeredMaterials, setRegisteredMaterials] = useState(() => history.readState()?.registeredMaterials ?? [])
+  const [registeredMaterials, setRegisteredMaterials] = useState(() => Object.assign([], { database: true }))
   const [isAIChatOpen, setAIChatOpen] = useState(false)
   const closeAIChat = useCallback(() => setAIChatOpen(false), [])
   const wasAIChatOpen = useRef(false)
@@ -45,11 +46,60 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
   const closeNotifications = useCallback(() => setNotificationOpen(false), [])
   const [chatMessages, setChatMessages] = useState([])
 
-  const [inventory, setInventory] = useState(() => history.readState()?.inventory ?? registerMaterials(createMockInventory(), history.readState()?.registeredMaterials ?? []))
+  const [inventory, setInventory] = useState({})
+  const [inventoryLoading, setInventoryLoading] = useState(true)
+  const [inventoryError, setInventoryError] = useState('')
+  const inventoryLoaded = useRef(false)
+  const [inventoryReady, setInventoryReady] = useState(false)
+  const inventoryRequest = useRef(0)
+  const reloadInventory = useCallback(async () => {
+    const request = ++inventoryRequest.current
+    if (!inventoryLoaded.current) setInventoryLoading(true); setInventoryError('')
+    try {
+      const result = await loadInventory(supabase, initialProfile.account.id)
+      if (request !== inventoryRequest.current) return
+      inventoryLoaded.current = true
+      setInventoryReady(true)
+      setInventory(result.inventory); setRegisteredMaterials(result.registrations)
+    } catch (error) {
+      if (request === inventoryRequest.current) setInventoryError('냉장고를 불러오지 못했어요. ' + (error.message || '잠시 후 다시 시도해주세요.'))
+      throw error
+    } finally { if (request === inventoryRequest.current) setInventoryLoading(false) }
+  }, [initialProfile.account.id])
+  useEffect(() => {
+    let disposed = false
+    queueMicrotask(() => { if (!disposed) reloadInventory().catch(() => {}) })
+    const refresh = () => { if (document.visibilityState === 'visible') reloadInventory().catch(() => {}) }
+    document.addEventListener('visibilitychange', refresh)
+    return () => { disposed = true; document.removeEventListener('visibilitychange', refresh) }
+  }, [reloadInventory])
+  const pendingDeduction = useRef(null)
+  const handleStockDeduction = async (selected) => {
+    const key = JSON.stringify(selected)
+    if (pendingDeduction.current?.key !== key) pendingDeduction.current = { key, changes: planDeductions(registeredMaterials, selected) }
+    await changeInventoryBatch(supabase, pendingDeduction.current.changes)
+    await reloadInventory()
+    pendingDeduction.current = null
+  }
+  const handleUpdateItem = async (id, draft) => {
+    const material = registeredMaterials.find(m => m.id === id)
+    if (!material) throw new Error('재료를 다시 확인해주세요.')
+    await saveInventoryItem(supabase, material.dbRow, draft)
+    await reloadInventory()
+  }
+  const pendingRemoval = useRef(null)
+  const handleRemoveItem = async (id) => {
+    const material = registeredMaterials.find(m => m.id === id)
+    if (!material) throw new Error('재료를 다시 확인해주세요.')
+    if (pendingRemoval.current?.id !== id) pendingRemoval.current = { id, delta: -material.purchaseAmount, status: 'discarded', request_id: crypto.randomUUID() }
+    await changeInventoryBatch(supabase, [pendingRemoval.current])
+    await reloadInventory()
+    pendingRemoval.current = null
+    handleMainNavigate('/fridge')
+  }
   const notifications = useMemo(() => [...createExpiryNotifications(buildFridgeItems(inventory, registeredMaterials, notificationNow), notificationNow), ...createMenuNotifications(inventory, notificationNow)].map((item) => ({ ...item, isRead: notificationReadIds.includes(item.id) })), [inventory, registeredMaterials, notificationNow, notificationReadIds])
   const handleMarkRead = (id) => setNotificationReadIds((ids) => markNotificationAsRead(ids, id))
   const handleMarkAllRead = () => setNotificationReadIds((ids) => markAllNotificationsAsRead(ids, notifications))
-  const handleStockDeduction = (selected) => setInventory(deductInventory(inventory, selected))
   useEffect(() => { history.replaceState({ ...history.readState(), inventory, registeredMaterials, cartItems }, '', location.href) }, [inventory, registeredMaterials, cartItems, screen, history])
   const [savedIds, setSavedIds] = useState([])
   const [recipeListState, setRecipeListState] = useState({})
@@ -121,15 +171,17 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
     history.pushState({ account, nickname, preferences, alerts, cartItems, registeredMaterials, inventory, source: 'fridge-direct', registrationId: crypto.randomUUID() }, '', '/shopping/register')
     setScreen('register')
   }
-  const handleRegisterToFridge = (materials) => {
-    if (!materials.length || (history.readState()?.source !== 'fridge-direct' && materials.some((item) => !cartItems.some((cart) => cart.id === item.id)))) throw new Error('장바구니에서 등록할 재료를 다시 선택해주세요.')
-    const nextInventory = registerMaterials(inventory, materials)
-    const registered = [...registeredMaterials, ...materials.map((item) => ({ ...item, ingredientName: item.ingredientName.trim(), consumedBeforeRegistration: Math.max(0, (createMockInventory()[item.ingredientId] ?? 0) + registeredMaterials.filter((entry) => entry.ingredientId === item.ingredientId).reduce((total, entry) => total + Number(entry.purchaseAmount) * entry.inventoryPerUnit, 0) - (inventory[item.ingredientId] ?? 0)), registeredAt: new Date().toISOString() }))]
-    const remaining = cartItems.filter((item) => !materials.some((material) => material.id === item.id))
-    setInventory(nextInventory)
-    setRegisteredMaterials(registered)
+  const registrationRequest = useRef(null)
+  const handleRegisterToFridge = async (materials) => {
+    if (!materials.length) throw new Error('등록할 재료가 없습니다.')
+    const key = JSON.stringify(materials)
+    if (registrationRequest.current?.key !== key) registrationRequest.current = { key, payload: toRegistrationPayload(materials, materials.map(() => crypto.randomUUID())) }
+    await registerInventory(supabase, registrationRequest.current.payload)
+    await reloadInventory()
+    const remaining = cartItems.filter(item => !materials.some(m => m.id === item.id))
     setCartItems(remaining)
-    history.replaceState({ account, nickname, preferences, alerts, cartItems: remaining, registeredMaterials: registered, inventory: nextInventory, registrationMessage: materials.length + '개 재료를 냉장고에 등록했어요.' }, '', '/fridge')
+    registrationRequest.current = null
+    history.replaceState({ registrationMessage: materials.length + '개 재료를 냉장고에 등록했어요.' }, '', '/fridge')
     setScreen('fridge')
   }
   const handleOpenPackageSolution = (item) => {
@@ -171,7 +223,7 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
     } else handleMainNavigate(action.type === 'recipe' ? '/recipe/' + action.recipeId : '/fridge')
   }
   const renderScreen = () => {
-  if (screen === 'ingredientDetail') return <IngredientDetail key={location.pathname} itemId={location.pathname.slice('/fridge/'.length)} inventory={inventory} registeredMaterials={registeredMaterials} onNavigate={handleMainNavigate} onBack={() => { if (history.readState()?.fromFridge) history.back(); else handleMainNavigate('/fridge') }} onBrowseRecipes={(name) => { setRecipeListState({ tab: 'recipes', category: 'AI 추천 메뉴', query: name, search: name }); handleMainNavigate('/recipe') }} />
+  if (screen === 'ingredientDetail') return <IngredientDetail onUpdate={handleUpdateItem} onRemove={handleRemoveItem} key={location.pathname} itemId={location.pathname.slice('/fridge/'.length)} inventory={inventory} registeredMaterials={registeredMaterials} onNavigate={handleMainNavigate} onBack={() => { if (history.readState()?.fromFridge) history.back(); else handleMainNavigate('/fridge') }} onBrowseRecipes={(name) => { setRecipeListState({ tab: 'recipes', category: 'AI 추천 메뉴', query: name, search: name }); handleMainNavigate('/recipe') }} />
   if (screen === 'packageMap') return <Suspense fallback={<div role="status" className="mx-auto flex h-dvh max-w-app items-center justify-center bg-white text-sm text-[#007451]">지도를 불러오는 중…</div>}><PackageMap key={history.readState()?.solutionId ?? 'empty'} item={cartItems.find((item) => item.id === history.readState()?.packageItemId)} selectedProductId={history.readState()?.packageView?.selectedProductId} onBack={handleClosePackageMap} onReplace={handleReplaceCartItem} /></Suspense>
   if (screen === 'packageSolution') return <PackageSolution key={history.readState()?.solutionId ?? 'empty'} item={cartItems.find((item) => item.id === history.readState()?.packageItemId)} onBack={() => { if (history.readState()?.fromShopping) history.back(); else handleMainNavigate('/shopping') }} onClose={() => { if (history.readState()?.fromRegistration) history.back(); else handleMainNavigate('/shopping') }} onOpenMap={handleOpenPackageMap} onReplace={handleReplaceCartItem} />
   if (screen === 'register') return <MaterialRegister key={history.readState()?.registrationId ?? 'empty'} source={history.readState()?.source} items={history.readState()?.registrationItems ?? []} onNavigate={handleMainNavigate} onBack={() => { if (history.readState()?.fromShopping || history.readState()?.source === 'fridge-direct') history.back(); else handleMainNavigate('/shopping') }} onRegister={handleRegisterToFridge} onOpenPackageSolution={handleOpenPackageSolution} />
@@ -182,7 +234,7 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
   if (showMainAssistant) return (
     <div className="relative mx-auto h-dvh w-full max-w-app">
       {screen === 'fridge' && <Fridge inventory={inventory} registeredMaterials={registeredMaterials} onNavigate={handleMainNavigate} onAdd={handleDirectRegistration} registrationMessage={history.readState()?.registrationMessage} />}
-      {screen === 'home' && <Home onNavigate={handleMainNavigate} />}
+      {screen === 'home' && <Home fridgeItems={buildFridgeItems(inventory, registeredMaterials)} nickname={nickname} onNavigate={handleMainNavigate} />}
       {screen === 'recipe' && <Recipe key={recipeSearchKey} onNavigate={handleMainNavigate} savedIds={savedIds} onToggleSave={toggleRecipeSave} listState={recipeListState} onListStateChange={setRecipeListState} />}
       {screen === 'mypage' && <MyPage onSaveSettings={handleSaveSettings} onSignOut={onSignOut} onNavigate={handleMainNavigate} onEditProfile={handleEditProfile} initialAlerts={alerts} account={account} nickname={nickname} initialPreferences={preferences} />}
       {screen === 'shopping' && <Cart items={cartItems} onItemsChange={setCartItems} onOpenPackageSolution={handleOpenPackageSolution} onStartRegistration={handleStartRegistration} registrationMessage={history.readState()?.registrationMessage} onNavigate={handleMainNavigate} onBack={() => { if (history.readState()?.fromApp) history.back(); else handleMainNavigate('/') }} />}
@@ -192,10 +244,11 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
   )
   if (screen === 'edit') return <EditProfilePage account={account} nickname={nickname} initialPreferences={preferences} onCancel={handleCancelEdit} onSave={handleSaveProfile} />
 
-  return <Home onNavigate={handleMainNavigate} />
+  return <Home fridgeItems={buildFridgeItems(inventory, registeredMaterials)} nickname={nickname} onNavigate={handleMainNavigate} />
   }
   return <NotificationContext.Provider value={{ open: openNotifications, isOpen: isNotificationOpen, unreadCount: notifications.filter((item) => !item.isRead).length }}>
-    {renderScreen()}
+    {inventoryLoading ? <div role="status" className="mx-auto max-w-app p-10 text-center">냉장고 정보를 불러오는 중…</div> : inventoryError && !inventoryReady ? <div role="alert" className="mx-auto max-w-app p-8"><p>{inventoryError}</p><button type="button" onClick={() => reloadInventory().catch(() => {})} className="mt-4 rounded-xl bg-[#006c49] px-5 py-3 text-white">다시 불러오기</button></div> : renderScreen()}
+    {inventoryError && inventoryReady && <div role="alert" className="fixed inset-x-4 bottom-20 z-50 mx-auto max-w-sm rounded-xl border bg-white p-4 shadow-lg"><p>{inventoryError}</p><button type="button" onClick={() => reloadInventory().catch(() => {})}>다시 불러오기</button></div>}
     {isNotificationOpen && <NotificationDrawer notifications={notifications} onClose={closeNotifications} onRead={handleMarkRead} onMarkAllRead={handleMarkAllRead} onAction={handleNotificationAction} />}
   </NotificationContext.Provider>
 }

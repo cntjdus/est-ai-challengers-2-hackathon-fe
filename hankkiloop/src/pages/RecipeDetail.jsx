@@ -63,7 +63,7 @@ export default function RecipeDetail({ recipeId, savedIds, onToggleSave, onBack,
         <button type="button" disabled={completed} onClick={handleCompleteCooking} className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#1b4535] text-base font-bold text-white shadow-lg disabled:bg-[#527466]"><Check aria-hidden="true" className="size-6 text-[#6ee7b7]" />{completed ? '요리 완료했어요' : '요리 완료 (재고 차감)'}</button>
 
       </footer>
-      {isStockSheetOpen && <StockDeductionSheet registeredMaterials={registeredMaterials} recipe={recipe} servings={servings} inventory={inventory} onClose={() => setIsStockSheetOpen(false)} onConfirm={(selected, skipped = 0) => { onDeductStock(selected); setCompletionNotice(skipped ? '재고가 확인된 ' + selected.length + '개 재료를 차감했어요. 미확인 ' + skipped + '개는 제외했습니다.' : '선택한 재료의 재고 차감을 완료했어요.'); setCompleted(true) }} />}
+      {isStockSheetOpen && <StockDeductionSheet registeredMaterials={registeredMaterials} recipe={recipe} servings={servings} inventory={inventory} onClose={() => setIsStockSheetOpen(false)} onConfirm={async (selected, skipped = 0) => { await onDeductStock(selected); setCompletionNotice(skipped ? '재고가 확인된 ' + selected.length + '개 재료를 차감했어요. 미확인 ' + skipped + '개는 제외했습니다.' : '선택한 재료의 재고 차감을 완료했어요.'); setCompleted(true) }} />}
     </div>
   )
 }

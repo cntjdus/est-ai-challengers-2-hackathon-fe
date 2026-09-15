@@ -3,23 +3,36 @@ import { ArrowRight, Bot, Image, Pencil, Refrigerator, Snowflake, Sun, Timer } f
 import EditProfileHeader from '../components/profile/EditProfileHeader'
 import BottomNavigation from '../components/common/BottomNavigation'
 import RecipeCard from '../components/recipe/RecipeCard'
-import { buildFridgeItems, expiryLabel, getFreshnessStatus, storageLabels, statusVariants } from '../data/inventory'
+import { buildFridgeItems, expiryLabel, storageLabels, statusVariants } from '../data/inventory'
 import { recipes } from '../data/recipes'
 import character from '../assets/hankkiloop-character.png'
 
 const storageIcons = { fridge: Refrigerator, freezer: Snowflake, room: Sun }
-export default function IngredientDetail({ itemId, inventory, registeredMaterials, onBack, onNavigate, onBrowseRecipes }) {
+export default function IngredientDetail({ itemId, inventory, registeredMaterials, onBack, onNavigate, onBrowseRecipes, onUpdate, onRemove }) {
   const [amountNotice, setAmountNotice] = useState(false)
   const item = buildFridgeItems(inventory, registeredMaterials).find((entry) => entry.id === itemId)
-  const handleEditAmount = () => setAmountNotice((current) => !current)
+  const [draft, setDraft] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [confirmRemove, setConfirmRemove] = useState(false)
+  const handleEditAmount = () => { setDraft({ name: item.name, quantity: String(item.amount), storage: item.storageType, date: item.expiryDate }); setAmountNotice(!amountNotice); setError('') }
+  const save = async () => {
+    if (saving) return
+    setSaving(true); setError('')
+    try { await onUpdate(item.id, draft); setAmountNotice(false) } catch (e) { setError(e.message) } finally { setSaving(false) }
+  }
+  const remove = async () => {
+    if (saving) return
+    setSaving(true); setError('')
+    try { await onRemove(item.id) } catch (e) { setError(e.message) } finally { setSaving(false) }
+  }
   if (!item) return <div className="mx-auto flex h-dvh w-full max-w-app flex-col overflow-hidden bg-[#f8f9ff]">
     <EditProfileHeader plain title="식재료 상세" align="left" dot onBack={onBack} />
     <main className="min-h-0 flex-1 overflow-y-auto px-5 py-12 text-center"><h2 className="text-base">식재료 정보를 찾을 수 없습니다.</h2><p className="mt-2 text-xs text-[#7c8595]">재료가 모두 소진되었거나 등록되지 않은 주소예요.</p><button type="button" onClick={() => onNavigate('/fridge')} className="mt-6 rounded-xl bg-[#006c49] px-5 py-3 text-sm text-white">냉장고로 돌아가기</button></main><BottomNavigation onNavigate={onNavigate} />
   </div>
   const StorageIcon = storageIcons[item.storageType] ?? Refrigerator
-  const freshness = getFreshnessStatus(item.freshnessScore)
   const recommended = item.recommendedRecipeIds.map((id) => recipes.find((recipe) => recipe.id === id)).filter(Boolean)
-  const purchase = new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric' }).format(new Date(item.purchaseDate + 'T12:00:00'))
+  const purchase = !item.purchaseDate ? '날짜 미등록' : new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric' }).format(new Date(item.purchaseDate + 'T12:00:00'))
   return <div className="mx-auto flex h-dvh w-full max-w-app flex-col overflow-hidden bg-[#f8f9ff] text-[#1e293b]">
     <div className="shrink-0 bg-white"><EditProfileHeader title="식재료 상세" align="left" dot plain onBack={onBack} /></div>
     <main aria-label="식재료 상세" className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 pt-3 pb-7">
@@ -36,10 +49,19 @@ export default function IngredientDetail({ itemId, inventory, registeredMaterial
         <div className="min-w-0 rounded-2xl border border-[#d1fae5] bg-white px-1.5 py-3 text-center shadow-xs"><h3 className="text-[10px] text-[#8792a2]">보관 상태</h3><p className="mt-2 flex items-center justify-center gap-0.5 text-[11px]"><StorageIcon aria-hidden="true" className="size-3 shrink-0 text-[#008768]" />{item.storageName}</p><p className="mt-1 text-[9px] text-[#008768]">{item.optimalTemperature}</p></div>
         <div className="min-w-0 rounded-2xl border border-[#d1fae5] bg-white px-1.5 py-3 text-center shadow-xs"><h3 className="text-[10px] text-[#8792a2]">등록/구매일</h3><p className="mt-2 text-xs font-semibold">{purchase}</p><p className="mt-1 text-[9px] text-[#f59e0b]">{item.storedDays}일째 보관 중</p></div>
       </section>
-      {amountNotice && <p role="status" className="rounded-xl border border-[#d1fae5] bg-white p-3 text-xs text-[#667085]">남은 양 직접 수정은 준비 중이에요. 현재는 재료 등록과 요리 완료 시 수량이 반영됩니다.</p>}
+      {amountNotice && draft && <fieldset disabled={saving} className="space-y-3 rounded-2xl bg-white p-4">
+        <legend>재료 정보 수정</legend>
+        <label className="block">이름<input aria-label="재료 이름 수정" className="block w-full border p-2" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} /></label>
+        <label className="block">남은 수량 ({item.unit})<input aria-label="남은 수량" type="number" min="0.0001" step="0.0001" className="block w-full border p-2" value={draft.quantity} onChange={e => setDraft({ ...draft, quantity: e.target.value })} /></label>
+        <label className="block">보관장소<select aria-label="보관장소 수정" value={draft.storage} onChange={e => setDraft({ ...draft, storage: e.target.value })}>{Object.entries(storageLabels).map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+        <label className="block">소비기한<input aria-label="소비기한 수정" type="date" min={item.purchaseDate} value={draft.date} onChange={e => setDraft({ ...draft, date: e.target.value })} /></label>
+        <button type="button" onClick={save} className="rounded-xl bg-[#006c49] px-5 py-3 text-white">{saving ? '저장 중…' : '변경 내용 저장'}</button>
+      </fieldset>}
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      <div className="rounded-2xl bg-white p-4">{confirmRemove ? <><p className="text-sm">이 재료를 폐기 처리하고 냉장고 목록에서 제거할까요?</p><button type="button" disabled={saving} onClick={remove} className="mr-4 mt-3 text-red-600">폐기 처리</button><button type="button" disabled={saving} onClick={() => setConfirmRemove(false)}>취소</button></> : <button type="button" onClick={() => setConfirmRemove(true)} className="text-sm text-red-600">냉장고에서 제거</button>}</div>
       <section aria-label="신선도와 보관 팁" className="rounded-3xl border border-[#a7f3d0] bg-gradient-to-br from-[#f6fcfa] to-[#eaf9f4] p-4 shadow-xs">
-        <div className="flex items-center gap-3"><div className="relative size-13 shrink-0 overflow-hidden rounded-2xl"><img src={character} alt="" className="absolute top-[-12%] left-[-2%] w-[255%] max-w-none" /></div><div><span className="inline-flex items-center gap-1 rounded-full bg-[#dff3eb] px-2 py-1 text-[9px] text-[#008768]"><Bot aria-hidden="true" className="size-3" />한끼루프 AI 신선 진단</span><h2 className="mt-1 text-sm">20대 자취생 맞춤 보관 팁</h2></div></div>
-        <div className="mt-4 rounded-2xl border border-[#d1fae5] bg-white/90 p-3"><div className="flex justify-between gap-1 text-[10px]"><span className="text-[#667085]">현재 신선도 추정</span><span className={freshness.textClassName}>● {freshness.label} ({item.freshnessScore}%)</span></div><div role="progressbar" aria-label="추정 신선도" aria-valuemin={0} aria-valuemax={100} aria-valuenow={item.freshnessScore} className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#f2f4f7]"><div className={`h-full rounded-full ${freshness.barClassName}`} style={{ width: item.freshnessScore + '%' }} /></div><div className="mt-2 flex justify-between gap-1 text-[9px] text-[#98a2b3]"><span>구매 당일</span><span className={freshness.textClassName}>{item.freshnessNote}</span><span>한계 도달</span></div></div>
+        <div className="flex items-center gap-3"><div className="relative size-13 shrink-0 overflow-hidden rounded-2xl"><img src={character} alt="" className="absolute top-[-12%] left-[-2%] w-[255%] max-w-none" /></div><div><span className="inline-flex items-center gap-1 rounded-full bg-[#dff3eb] px-2 py-1 text-[9px] text-[#008768]"><Bot aria-hidden="true" className="size-3" />소비기한 및 보관 안내</span><h2 className="mt-1 text-sm">제품 표시를 기준으로 확인해주세요</h2></div></div>
+        <p className="mt-4 rounded-2xl bg-white p-3 text-sm">{item.expiryDate ? '등록한 소비기한: ' + item.expiryDate + ' · ' + expiryLabel(item.daysLeft) : '소비기한이 등록되지 않았어요.'}</p>
         <div className="relative mt-3 rounded-2xl border border-[#a7f3d0]/70 bg-white p-3 text-xs leading-5 text-[#475467] before:absolute before:-top-1.5 before:left-6 before:size-3 before:rotate-45 before:border-t before:border-l before:border-[#a7f3d0]/70 before:bg-white"><p>{item.storageTip}</p></div>
       </section>
       <section aria-label="소진 추천 레시피" className="pt-1"><div className="mb-3 flex items-center justify-between gap-2"><h2 className="min-w-0 break-words text-sm">{item.name} 소진 추천 레시피</h2><span className="shrink-0 rounded-full bg-[#ecfdf5] px-2 py-1 text-[9px] text-[#008768]">소진 우선순위</span></div><div className="space-y-2">{recommended.slice(0, 2).map((recipe) => { const used = recipe.ingredients.find((entry) => entry.id === item.ingredientId); return <RecipeCard key={recipe.id} recipe={recipe} compact usage={used ? used.name + ' ' + Number((used.quantity * (used.unit === item.unit ? 1 : item.displayPerUnit)).toFixed(2)) + item.unit + ' 소진' : ''} onOpen={() => onNavigate('/recipe/' + recipe.id)} /> })}{!recommended.length && <p className="rounded-2xl border border-[#d1fae5] bg-white p-5 text-center text-xs text-[#8792a2]">아직 연결된 추천 레시피가 없어요.</p>}</div></section>

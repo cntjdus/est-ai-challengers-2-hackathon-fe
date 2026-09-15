@@ -13,10 +13,10 @@ export default function Fridge({ inventory, registeredMaterials, onNavigate, onA
   const [sort, setSort] = useState('expiry')
   const alertRef = useRef(null)
   const items = useMemo(() => buildFridgeItems(inventory, registeredMaterials), [inventory, registeredMaterials])
-  const allUrgent = items.filter((item) => item.daysLeft <= 2).sort((a, b) => a.daysLeft - b.daysLeft)
+  const allUrgent = items.filter((item) => item.daysLeft !== null && item.daysLeft <= 2).sort((a, b) => (a.daysLeft ?? Infinity) - (b.daysLeft ?? Infinity))
   const visible = items.filter((item) => (storage === 'all' || storage === item.storageType) && item.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
-    .sort((a, b) => sort === 'expiry' ? a.daysLeft - b.daysLeft : b.purchaseDate.localeCompare(a.purchaseDate))
-  const urgent = visible.filter((item) => item.daysLeft <= 2).sort((a, b) => a.daysLeft - b.daysLeft)
+    .sort((a, b) => sort === 'expiry' ? (a.daysLeft ?? Infinity) - (b.daysLeft ?? Infinity) : b.purchaseDate.localeCompare(a.purchaseDate))
+  const urgent = visible.filter((item) => item.daysLeft !== null && item.daysLeft <= 2).sort((a, b) => (a.daysLeft ?? Infinity) - (b.daysLeft ?? Infinity))
   return <div className="mx-auto flex h-dvh w-full max-w-app flex-col overflow-hidden bg-[#fafcf9] text-[#202833]">
     <HomeHeader pageLabel="냉장고" onProfile={() => onNavigate('/mypage')} onNotifications={() => alertRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
     <main aria-label="냉장고" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-4 pb-20">

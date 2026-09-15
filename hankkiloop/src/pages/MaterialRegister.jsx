@@ -5,16 +5,17 @@ import BottomNavigation from '../components/common/BottomNavigation'
 import IngredientRegisterForm from '../components/register/IngredientRegisterForm'
 import PhotoRecognitionSection from '../components/register/PhotoRecognitionSection'
 import character from '../assets/hankkiloop-character.png'
-import { calculateExpiryDate, createDirectRegistrationDraft, createRegistrationDraft, solutionOptions, storageGuides, validateMaterial } from '../data/materialRegistration'
+import { createDirectRegistrationDraft, createRegistrationDraft, solutionOptions, storageGuides, validateMaterial } from '../data/materialRegistration'
 
 export default function MaterialRegister({ items, source, onNavigate, onBack, onRegister, onOpenPackageSolution }) {
-  const [materials, setMaterials] = useState(() => (history.state?.registrationDraft ?? (source === 'fridge-direct' ? createDirectRegistrationDraft() : createRegistrationDraft(items))).map((item) => ({ ...item, recognizedFromPhoto: false })))
+  const [materials, setMaterials] = useState(() => (history.state?.registrationDraft ?? (source === 'fridge-direct' ? createDirectRegistrationDraft() : createRegistrationDraft(items))).map((item) => ({ ...item, recognizedFromPhoto: false, expiryDate: item.expiryAutomatic ? '' : item.expiryDate, expiryAutomatic: false })))
   const [mode, setMode] = useState('manual')
   const [solution, setSolution] = useState('freeze')
   const [activeIndex, setActiveIndex] = useState(0)
   const [photo, setPhoto] = useState(null)
   const [error, setError] = useState('')
   const submitted = useRef(false)
+  const [saving, setSaving] = useState(false)
   const formRef = useRef(null)
   const material = materials[activeIndex]
   const recognizedIngredients = materials.filter((item) => item.recognizedFromPhoto)
@@ -25,8 +26,6 @@ export default function MaterialRegister({ items, source, onNavigate, onBack, on
       if (index !== activeIndex) return item
       const next = { ...item, ...changes }
       if ('storageType' in changes || 'purchaseDate' in changes) {
-        next.expiryDate = calculateExpiryDate(next.storageType, next.purchaseDate)
-        next.expiryAutomatic = true
         next.storageGuide = storageGuides[next.storageType]
       }
       return next
@@ -34,9 +33,9 @@ export default function MaterialRegister({ items, source, onNavigate, onBack, on
   }
   const handlePhotoChange = (nextPhoto) => {
     setPhoto(nextPhoto)
-    if (nextPhoto?.url !== photo?.url) setMaterials((current) => current.map((item) => ({ ...item, recognizedFromPhoto: false })))
+    if (nextPhoto?.url !== photo?.url) setMaterials((current) => current.map((item) => ({ ...item, recognizedFromPhoto: false, expiryDate: item.expiryAutomatic ? '' : item.expiryDate, expiryAutomatic: false })))
   }
-  const handleRegisterToFridge = () => {
+  const handleRegisterToFridge = async () => {
     if (submitted.current || !materials.length) return
     const invalidIndex = materials.findIndex((item) => validateMaterial(item))
     if (invalidIndex !== -1) {
@@ -46,10 +45,9 @@ export default function MaterialRegister({ items, source, onNavigate, onBack, on
       return
     }
     try {
-      // TODO: 냉장고 등록 API 연결. 성공한 뒤에만 장바구니에서 제거합니다.
-      onRegister(materials)
-      submitted.current = true
-    } catch (failure) { setError(failure.message) }
+      submitted.current = true; setSaving(true)
+      await onRegister(materials)
+    } catch (failure) { submitted.current = false; setError(failure.message) } finally { setSaving(false) }
   }
   return <div className="mx-auto flex h-dvh w-full max-w-app flex-col overflow-hidden bg-[#fafcf9] text-[#1e293b]">
     <EditProfileHeader title="재료 등록" plain onBack={onBack} action={<button type="button" aria-label="재료 등록 닫기" onClick={() => onNavigate(source === 'fridge-direct' ? '/fridge' : '/shopping')} className="flex size-9 items-center justify-center rounded-full"><X aria-hidden="true" className="size-5" /></button>} />
@@ -62,7 +60,7 @@ export default function MaterialRegister({ items, source, onNavigate, onBack, on
         {(materials.length > 1 || mode === 'photo') && <section className="my-5"><h2 className="text-sm">{mode === 'photo' ? '인식된 식재료' : '등록할 식재료'} <span className="rounded-full bg-[#e2efe9] px-1.5 text-xs text-[#006c49]">{mode === 'photo' ? recognizedIngredients.length : materials.length}</span></h2><div className="mt-2 flex flex-wrap gap-2">{materials.map((item, index) => <button type="button" key={item.id} aria-pressed={index === activeIndex} onClick={() => { setActiveIndex(index); setError('') }} className="rounded-full border border-[#e2e8f0] px-3 py-1.5 text-xs text-[#64748b] aria-pressed:border-[#10b981] aria-pressed:bg-[#ecfdf5] aria-pressed:text-[#006c49]">{item.ingredientName || '이름 없음'}</button>)}</div></section>}
         <div ref={formRef} className="scroll-mt-4"><IngredientRegisterForm material={material} onChange={handleMaterialChange} /></div>
         {error && <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>}
-        <button type="button" onClick={handleRegisterToFridge} className="mt-7 flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl bg-[#006c49] px-3 py-3 text-sm text-white shadow-md">확인하고 냉장고에 등록하기<ArrowRight aria-hidden="true" className="size-4" /></button>
+        <button type="button" disabled={saving} onClick={handleRegisterToFridge} className="mt-7 flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl bg-[#006c49] px-3 py-3 text-sm text-white shadow-md">{saving ? '저장 중…' : '확인하고 냉장고에 등록하기'}<ArrowRight aria-hidden="true" className="size-4" /></button>
         {materials.length > 1 && <p className="mt-2 text-center text-[10px] text-[#7c8595]">선택한 {materials.length}개 재료를 함께 등록합니다.</p>}
       </>}
     </main>

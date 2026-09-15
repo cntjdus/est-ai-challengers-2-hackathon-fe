@@ -7,7 +7,7 @@ import AvoidIngredientsSection from '../components/preferenceSetup/AvoidIngredie
 import PreferenceFooter from '../components/preferenceSetup/PreferenceFooter'
 
 export default function PreferenceSetupPage({ account, nickname, initialPreferences, onComplete, busy, error, onBack }) {
-  const { preferences, dietaryProps, avoidProps } = usePreferences(initialPreferences)
+  const { preferences, dietaryProps, avoidProps, allergyProps } = usePreferences(initialPreferences)
   const pageRef = useRef(null)
   useEffect(() => { pageRef.current.focus() }, [])
 
@@ -23,7 +23,7 @@ export default function PreferenceSetupPage({ account, nickname, initialPreferen
         <div className="flex flex-col gap-7">
           <button type="button" onClick={onBack} disabled={busy} className="text-left text-sm text-[#006c49]">← 닉네임 설정으로</button>
           <WelcomeCard />
-          <fieldset disabled={busy} className="space-y-7"><DietaryPreferencesSection {...dietaryProps} /><AvoidIngredientsSection {...avoidProps} /></fieldset>
+          <fieldset disabled={busy} className="space-y-7"><DietaryPreferencesSection {...dietaryProps} /><AvoidIngredientsSection {...avoidProps} /><AvoidIngredientsSection {...allergyProps} /></fieldset>
           {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
         </div>
       </main>

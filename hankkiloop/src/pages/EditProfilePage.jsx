@@ -14,7 +14,7 @@ export default function EditProfilePage({ account, nickname = '자취새싹이',
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const saving = useRef(false)
-  const { preferences, dietaryProps, avoidProps } = usePreferences(initialPreferences)
+  const { preferences, dietaryProps, avoidProps, allergyProps } = usePreferences(initialPreferences)
   const isNicknameValid = isValidNickname(editedNickname)
   const canSave = isNicknameValid && !busy
   const pageRef = useRef(null)
@@ -37,7 +37,7 @@ export default function EditProfilePage({ account, nickname = '자취새싹이',
         <fieldset disabled={busy} className="flex flex-col gap-4">
           <AccountInfoCard email={account.email} nickname={editedNickname} onNicknameChange={setEditedNickname} realName={realName} isNicknameValid={isNicknameValid} />
           <DietaryPreferencesSection {...dietaryProps} showAddButton />
-          <AvoidIngredientsSection {...avoidProps} />
+          <AvoidIngredientsSection {...avoidProps} /><AvoidIngredientsSection {...allergyProps} />
           {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
         </fieldset>
       </main>

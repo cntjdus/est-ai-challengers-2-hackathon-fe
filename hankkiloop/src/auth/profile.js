@@ -1,7 +1,7 @@
 import { isValidNickname } from '../utils/profileValidation.js'
 
 export const emptyPreferences = {
-  householdType: 'single', cookingFrequency: '3-4', dietStyles: [], excludedIngredients: [],
+  householdType: 'single', cookingFrequency: '3-4', dietStyles: [], excludedIngredients: [], allergies: [],
 }
 
 export function frequencyFromCount(count) {
@@ -22,6 +22,7 @@ export function mapAccount(user, profile, preferences) {
       cookingFrequency: preferences?.cooking_frequency || frequencyFromCount(preferences?.weekly_cooking_count ?? 3),
       dietStyles: preferences?.preferred_tastes || [],
       excludedIngredients: preferences?.excluded_ingredients || [],
+      allergies: preferences?.allergies || [],
     },
     alerts: {
       expirationAlert: preferences?.expiry_alert_enabled ?? false,
@@ -43,9 +44,9 @@ export function preferencePayload(userId, preferences, alerts) {
     cooking_frequency: preferences.cookingFrequency,
     preferred_tastes: normalizeTags(preferences.dietStyles),
     excluded_ingredients: normalizeTags(preferences.excludedIngredients),
+    ...(preferences.allergies === undefined ? {} : { allergies: normalizeTags(preferences.allergies) }),
     expiry_alert_enabled: Boolean(alerts.expirationAlert),
     recipe_suggestion_enabled: Boolean(alerts.recipeSuggestionAlert),
-    updated_at: new Date().toISOString(),
   }
 }
 
@@ -74,7 +75,7 @@ export async function saveAccount(client, user, draft, completeOnboarding = fals
   // Omitted fields (allergies, exact cooking count, alert lead days) are not overwritten on conflict.
   const { error: preferencesError } = await client.from('user_preferences').upsert(payload, { onConflict: 'user_id' })
   if (preferencesError) throw preferencesError
-  const profileUpdate = { display_name: nickname, updated_at: new Date().toISOString() }
+  const profileUpdate = { display_name: nickname }
   if (completeOnboarding) profileUpdate.onboarding_completed_at = new Date().toISOString()
   const { error } = await client.from('profiles').update(profileUpdate).eq('id', user.id).select('id').single()
   if (error) throw error

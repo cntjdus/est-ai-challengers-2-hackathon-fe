@@ -22,6 +22,7 @@ const seedMetadata = {
 }
 export const storageLabels = { fridge: '냉장', freezer: '냉동', room: '실온' }
 export const statusVariants = {
+  unknown: { label: '날짜 미등록', className: 'bg-gray-100 text-gray-600', barClassName: 'bg-gray-300' },
   expired: { label: '소비기한 지남', className: 'bg-[#ffe3e4] text-[#ed3343]', barClassName: 'bg-[#ed3343]' },
   urgent: { label: '소비 임박', className: 'bg-[#fff3c4] text-[#b5611d]', barClassName: 'bg-[#f59e0b]' },
   warning: { label: '주의', className: 'bg-[#ffe8dc] text-[#bd601f]', barClassName: 'bg-[#f97316]' },
@@ -44,6 +45,7 @@ export function getDaysUntilExpiry(expiryDate, now = new Date()) {
 }
 export const expiryLabel = (days) => days === null ? '날짜 확인 필요' : days < 0 ? '소비기한 지남' : days === 0 ? 'D-DAY' : 'D-' + days
 export function buildFridgeItems(inventory, registrations = [], now = new Date()) {
+  if (registrations.database) return buildDatabaseItems(registrations, now)
   const shifted = (offset) => new Date(dateNumber(todayString(now)) + offset * 86400000).toISOString().slice(0, 10)
   const lots = inventoryIngredients.map((ingredient) => {
     const meta = seedMetadata[ingredient.id] ?? { storageType: 'fridge', purchasedAgo: 0, expiresIn: 7 }
@@ -105,4 +107,17 @@ function ingredientDetailFields(lot, daysLeft, storedDays, duration) {
     storageTip: lot.storageTip || meta.storageTip || '제품에 표시된 보관 방법과 소비기한을 확인해주세요. 보관 장소에 맞게 밀폐하여 보관하고, 개봉한 날짜를 함께 기록하면 관리하기 편해요.',
     recommendedRecipeIds: recipes.filter((recipe) => recipe.ingredients.some((item) => item.id === lot.ingredientId)).map((recipe) => recipe.id),
   }
+}
+
+export function buildDatabaseItems(registrations, now) {
+  return registrations.map(m => {
+    const daysLeft = getDaysUntilExpiry(m.expiryDate, now)
+    const storedDays = m.purchaseDate ? Math.max(0, -getDaysUntilExpiry(m.purchaseDate, now)) : 0
+    const duration = daysLeft === null ? 1 : Math.max(1, storedDays + daysLeft)
+    const lot = { id: m.id, ingredientId: m.ingredientId, name: m.ingredientName, amount: m.purchaseAmount, unit: m.unit, displayPerUnit: 1, purchaseDate: m.purchaseDate, expiryDate: m.expiryDate, storageType: m.storageType }
+    return { ...lot, ...ingredientDetailFields(lot, daysLeft, storedDays, duration), daysLeft, storedDays,
+      status: daysLeft === null ? 'unknown' : daysLeft < 0 ? 'expired' : daysLeft <= 2 ? 'urgent' : daysLeft <= 5 ? 'warning' : 'relaxed',
+      freshnessPercent: daysLeft === null ? 0 : Math.max(0, Math.min(100, Math.round(daysLeft / duration * 100))),
+      recommendedRecipes: recipes.filter(r => r.ingredients.some(i => i.id === m.ingredientId)).map(r => r.title) }
+  })
 }

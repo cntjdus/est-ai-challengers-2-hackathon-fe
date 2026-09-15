@@ -38,9 +38,9 @@ export default function StockDeductionSheet({ recipe, servings, inventory, regis
     setFormError('')
     if (!adding) requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'nearest' }))
   }
-  const handleStockDeduction = (close) => {
+  const handleStockDeduction = async (close) => {
     if (!selected.length || submitted.current) return
-    try { onConfirm(toInventoryDeductions(selected), skipped); submitted.current = true; close() } catch (failure) { setError(failure.message) }
+    try { submitted.current = true; await onConfirm(toInventoryDeductions(selected), skipped); close() } catch (failure) { submitted.current = false; setError(failure.message) }
   }
   return <BottomSheet fitVisualViewport onClose={onClose} labelledBy="stock-title" describedBy="stock-description" label="재고 차감" header={(close) => <header className="border-b border-[#f0f1f4] px-5 pb-3"><div className="flex items-center justify-between gap-1"><div className="flex flex-wrap items-center gap-1.5"><h2 id="stock-title" className="text-base font-bold tracking-tight">사용한 식재료 재고 차감</h2><span className="rounded-full border border-[#bbf7d0] bg-[#ecfdf5] px-2 py-0.5 text-[10px] font-semibold text-[#008768]">자동 계산</span></div><button type="button" onClick={close} aria-label="재고 차감 닫기" className="flex size-8 shrink-0 items-center justify-center text-[#9ca3af]"><X aria-hidden="true" className="size-4" /></button></div><p id="stock-description" className="mt-1 text-[10px] text-[#6b7280]">요리에 소진된 재료만 골라 냉장고에서 빼드릴게요</p></header>} footer={(close) => <footer className="shrink-0 bg-white px-5 pt-2 pb-[max(16px,env(safe-area-inset-bottom))]">{error && <p role="alert" className="mb-2 text-xs text-red-600">{error}</p>}{skipped > 0 && <p className="mb-2 text-[10px] text-[#7c8595]">재고를 확인할 수 없는 {skipped}개 재료는 실제 차감에서 제외됩니다.</p>}<button type="button" disabled={!selected.length || submitted.current} onClick={() => handleStockDeduction(close)} className="flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl bg-[#1b4535] px-2 py-3 text-[12px] font-bold text-white shadow-lg disabled:bg-[#9caeaa]"><Check aria-hidden="true" className="size-5 shrink-0 text-[#6ee7b7]" />선택한 {selected.length}개 재료 냉장고에서 차감하기</button></footer>}>
     <div className="px-5 pt-3 pb-4">

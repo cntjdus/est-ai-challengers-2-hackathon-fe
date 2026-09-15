@@ -9,7 +9,7 @@ import SmartCareCard from '../components/mypage/SmartCareCard'
 import BottomNavigation from '../components/common/BottomNavigation'
 
 export default function MyPage({ account, nickname = '자취새싹이', initialPreferences, onEditProfile, initialAlerts, onNavigate, onSaveSettings, onSignOut }) {
-  const { preferences, dietaryProps, avoidProps } = usePreferences(initialPreferences)
+  const { preferences, dietaryProps, avoidProps, allergyProps } = usePreferences(initialPreferences)
   const [expirationAlert, setExpirationAlert] = useState(initialAlerts?.expirationAlert ?? true)
   const [recipeSuggestionAlert, setRecipeSuggestionAlert] = useState(initialAlerts?.recipeSuggestionAlert ?? false)
   const [busy, setBusy] = useState(false)
@@ -45,7 +45,7 @@ export default function MyPage({ account, nickname = '자취새싹이', initialP
           <ProfileCard account={account} nickname={nickname} preferences={preferences} onEdit={handleEditProfile} />
           <fieldset disabled={busy} className="space-y-3.5">
           <DietaryPreferencesSection {...dietaryProps} />
-          <AvoidIngredientsSection {...avoidProps} />
+          <AvoidIngredientsSection {...avoidProps} /><AvoidIngredientsSection {...allergyProps} />
           <SmartCareCard expirationAlert={expirationAlert} onExpirationChange={setExpirationAlert} recipeSuggestionAlert={recipeSuggestionAlert} onRecipeChange={setRecipeSuggestionAlert} />
           <button type="button" onClick={() => runAction(() => onSaveSettings({ preferences, alerts: { expirationAlert, recipeSuggestionAlert } }), '설정을 저장했어요.')} className="min-h-12 w-full rounded-xl bg-[#006c49] px-4 py-3 text-sm text-white">{busy ? '처리 중…' : '설정 저장'}</button>
           </fieldset>
