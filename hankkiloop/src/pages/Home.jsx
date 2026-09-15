@@ -33,7 +33,7 @@ export default function Home({ onNavigate }) {
             <div className="rounded-2xl border border-[#e5ece7] bg-white p-3.5 shadow-xs"><div className="flex items-center justify-between gap-1"><h3 className="text-xs text-[#ea580c]">소비 임박 알림</h3><span aria-hidden="true" className="flex size-7 items-center justify-center rounded-full bg-[#fffbeb] text-sm text-[#f59e0b]"><TriangleAlert aria-hidden="true" className="size-4" /></span></div><p className="mt-2 text-base text-[#c66b43]">대파, 두부</p><p className="mt-1 text-[10px] text-[#94a3b8]">소비 권장 D-2 마감</p></div>
           </div>
         </section>
-        <section className="mt-7"><h2 className="mb-3 flex items-center gap-2 px-1 text-sm text-[#1e293b]"><CookingPot aria-hidden="true" className="size-4 text-[#ea8000]" />남은 재료로 오늘 저녁 뚝딱</h2><HomeRecipeCard onOpen={handleRecipe} /></section>
+        <section className="mt-7"><h2 className="mb-3 flex items-center gap-2 px-1 text-sm text-[#1e293b]"><CookingPot aria-hidden="true" className="size-4 text-[#ea8000]" />남은 재료로 오늘 저녁 뚝딱</h2><HomeRecipeCard onOpen={() => onNavigate('/recipe/tofu')} /></section>
         <aside className="mt-4 flex items-center gap-3 rounded-2xl border border-[#d1fae5] bg-[#ecfdf5]/70 p-3.5"><span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-[#a7f3d0]/70 bg-white"><Lightbulb aria-hidden="true" className="size-5 text-[#008b65]" /></span><p className="text-xs leading-[17px] text-[#334155]">대파는 송송 썰어 냉동실에 보관하면<br /><span className="text-[11px] text-[#94a3b8]">최대 한 달 동안 향긋하고 신선하게 쓸 수 있어요.</span></p></aside>
       </main>
       <BottomNavigation onNavigate={onNavigate} />

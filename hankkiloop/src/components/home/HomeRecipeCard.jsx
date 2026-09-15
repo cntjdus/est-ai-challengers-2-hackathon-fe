@@ -8,6 +8,6 @@ export default function HomeRecipeCard({ imageSrc, onOpen }) {
     <span className="inline-block rounded-full border border-[#a7f3d0]/70 bg-[#ecfdf5] px-2 py-0.5 text-[11px] text-[#047857]">저메추! 딱 좋은 메뉴</span>
     <div className="mt-2 flex items-center justify-between"><h3 className="text-base text-[#1e293b]">두부 계란 볶음</h3><button type="button" aria-label="레시피 저장" aria-pressed={saved} onClick={() => setSaved(!saved)} className="flex size-8 items-center justify-center rounded-full bg-[#f8fafc] text-[#64748b] aria-pressed:bg-[#d1fae5] aria-pressed:text-[#006c49]"><Bookmark aria-hidden="true" className="size-4" fill={saved ? "currentColor" : "none"} /></button></div>
     <p className="mt-1.5 text-xs leading-[19px] text-[#64748b]">지금 있는 대파와 두부 1/2모만으로 간편하고 영양가 높은 한 끼를 준비할 수 있어요.</p>
-    <button type="button" onClick={onOpen} className="mt-3 flex min-h-11 w-full items-center justify-center gap-1 rounded-2xl bg-[#1b4d3e] px-3 text-xs text-white">레시피 단계별로 보기<BookOpen aria-hidden="true" className="size-3.5" /></button>
+    <button type="button" onClick={onOpen} className="mt-3 flex min-h-11 w-full items-center justify-center gap-1 rounded-2xl bg-[#1b4d3e] px-3 text-xs text-white">레시피 보러가기<BookOpen aria-hidden="true" className="size-3.5" /></button>
   </article>
 }
