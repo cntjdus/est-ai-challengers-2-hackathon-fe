@@ -1,4 +1,8 @@
-# React + Vite
+# 한끼루프
+
+Google 로그인 환경변수, Supabase 설정, DB 마이그레이션 및 검증 방법은 [로그인 연결 안내](docs/SUPABASE_LOGIN_SETUP.md)를 참고하세요.
+
+## 개발 환경
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 

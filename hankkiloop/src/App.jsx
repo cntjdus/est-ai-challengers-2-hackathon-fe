@@ -1,3 +1,4 @@
+import { createUserHistory } from './auth/navigation'
 import NotificationDrawer from './components/notifications/NotificationDrawer'
 import { NotificationContext } from './components/notifications/NotificationContext'
 import { createExpiryNotifications, createMenuNotifications, markNotificationAsRead, markAllNotificationsAsRead } from './data/notifications'
@@ -18,19 +19,15 @@ import Recipe from './pages/Recipe'
 import Home from './pages/Home'
 import EditProfilePage from './pages/EditProfilePage'
 import MyPage from './pages/MyPage'
-import PreferenceSetupPage from './pages/PreferenceSetupPage'
-import OnboardingPage from './pages/OnboardingPage'
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import LoginPage from './pages/LoginPage'
-import AccountConsentPage from './pages/AccountConsentPage'
-import { defaultGoogleAccount } from './data/googleAccount'
 
 const PackageMap = lazy(() => import('./pages/PackageMap'))
 
-export default function App() {
+export default function App({ initialProfile, onSaveProfile, onSignOut }) {
+  const history = useMemo(() => createUserHistory(initialProfile.account.id), [initialProfile.account.id])
   const [screen, setScreen] = useState(() => location.pathname.startsWith('/fridge/') ? 'ingredientDetail' : location.pathname === '/fridge' ? 'fridge' : location.pathname === '/shopping/package-solution/map' ? 'packageMap' : location.pathname === '/shopping/package-solution' ? 'packageSolution' : location.pathname === '/shopping/register' ? 'register' : location.pathname === '/shopping' ? 'shopping' : location.pathname === '/ai-chat' ? 'aiChat' : location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : 'login')
-  const [cartItems, setCartItems] = useState(() => history.state?.cartItems ?? initialCartItems)
-  const [registeredMaterials, setRegisteredMaterials] = useState(() => history.state?.registeredMaterials ?? [])
+  const [cartItems, setCartItems] = useState(() => history.readState()?.cartItems ?? initialCartItems)
+  const [registeredMaterials, setRegisteredMaterials] = useState(() => history.readState()?.registeredMaterials ?? [])
   const [isAIChatOpen, setAIChatOpen] = useState(false)
   const closeAIChat = useCallback(() => setAIChatOpen(false), [])
   const wasAIChatOpen = useRef(false)
@@ -48,27 +45,24 @@ export default function App() {
   const closeNotifications = useCallback(() => setNotificationOpen(false), [])
   const [chatMessages, setChatMessages] = useState([])
 
-  const [inventory, setInventory] = useState(() => history.state?.inventory ?? registerMaterials(createMockInventory(), history.state?.registeredMaterials ?? []))
+  const [inventory, setInventory] = useState(() => history.readState()?.inventory ?? registerMaterials(createMockInventory(), history.readState()?.registeredMaterials ?? []))
   const notifications = useMemo(() => [...createExpiryNotifications(buildFridgeItems(inventory, registeredMaterials, notificationNow), notificationNow), ...createMenuNotifications(inventory, notificationNow)].map((item) => ({ ...item, isRead: notificationReadIds.includes(item.id) })), [inventory, registeredMaterials, notificationNow, notificationReadIds])
   const handleMarkRead = (id) => setNotificationReadIds((ids) => markNotificationAsRead(ids, id))
   const handleMarkAllRead = () => setNotificationReadIds((ids) => markAllNotificationsAsRead(ids, notifications))
   const handleStockDeduction = (selected) => setInventory(deductInventory(inventory, selected))
-  useEffect(() => { history.replaceState({ ...history.state, inventory, registeredMaterials, cartItems }, '', location.href) }, [inventory, registeredMaterials, cartItems, screen])
+  useEffect(() => { history.replaceState({ ...history.readState(), inventory, registeredMaterials, cartItems }, '', location.href) }, [inventory, registeredMaterials, cartItems, screen, history])
   const [savedIds, setSavedIds] = useState([])
   const [recipeListState, setRecipeListState] = useState({})
   const toggleRecipeSave = (id) => setSavedIds((previous) => previous.includes(id) ? previous.filter((item) => item !== id) : [...previous, id])
-  const [account, setAccount] = useState(() => history.state?.account ?? defaultGoogleAccount)
-  const [nickname, setNickname] = useState(() => history.state?.nickname ?? '자취새싹이')
-  const [preferences, setPreferences] = useState(() => history.state?.preferences)
-  const handleComplete = (profile) => {
-    setAccount(profile.account)
-    setNickname(profile.nickname)
-    setPreferences(profile.preferences)
-    history.replaceState(profile, '', '/mypage')
-    setScreen('mypage')
+  const [account, setAccount] = useState(initialProfile.account)
+  const [nickname, setNickname] = useState(initialProfile.nickname)
+  const [preferences, setPreferences] = useState(initialProfile.preferences)
+  const [alerts, setAlerts] = useState(initialProfile.alerts)
+  const handleSaveSettings = async (draft) => {
+    const saved = await onSaveProfile({ nickname, preferences: draft.preferences, alerts: draft.alerts })
+    setPreferences(saved.preferences)
+    setAlerts(saved.alerts)
   }
-  const [alerts, setAlerts] = useState(() => history.state?.alerts)
-  const syncMyPageDraft = useCallback((draft) => { setPreferences(draft.preferences); setAlerts(draft.alerts) }, [])
   const handleEditProfile = (profile) => {
     setAccount(profile.account)
     setNickname(profile.nickname)
@@ -79,48 +73,30 @@ export default function App() {
     setScreen('edit')
   }
   const handleCancelEdit = () => {
-    if (history.state?.fromMyPage) history.back()
+    if (history.readState()?.fromMyPage) history.back()
     else {
       history.replaceState({ account, nickname, preferences, alerts }, '', '/mypage')
       setScreen('mypage')
     }
   }
-  const handleSaveProfile = (profile) => {
-    handleComplete({ ...profile, alerts })
+  const handleSaveProfile = async (draft) => {
+    const saved = await onSaveProfile({ ...draft, alerts })
+    setAccount(saved.account)
+    setNickname(saved.nickname)
+    setPreferences(saved.preferences)
+    history.replaceState({}, '', '/mypage')
+    setScreen('mypage')
   }
-  const [agreeAll, setAgreeAll] = useState(true)
   useEffect(() => {
     const handlePopState = () => {
+      history.replaceState(history.readState() ?? {}, '', location.href)
       setNotificationOpen(false)
       setAIChatOpen(false)
-      if (history.state?.account) setAccount(history.state.account)
-      if (history.state?.nickname !== undefined) setNickname(history.state.nickname)
-      setPreferences(history.state?.preferences)
-      setAlerts(history.state?.alerts)
-      setScreen(location.pathname.startsWith('/fridge/') ? 'ingredientDetail' : location.pathname === '/fridge' ? 'fridge' : location.pathname === '/shopping/package-solution/map' ? 'packageMap' : location.pathname === '/shopping/package-solution' ? 'packageSolution' : location.pathname === '/shopping/register' ? 'register' : location.pathname === '/shopping' ? 'shopping' : location.pathname === '/ai-chat' ? 'aiChat' : location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : (history.state?.screen ?? 'login'))
+      setScreen(location.pathname.startsWith('/fridge/') ? 'ingredientDetail' : location.pathname === '/fridge' ? 'fridge' : location.pathname === '/shopping/package-solution/map' ? 'packageMap' : location.pathname === '/shopping/package-solution' ? 'packageSolution' : location.pathname === '/shopping/register' ? 'register' : location.pathname === '/shopping' ? 'shopping' : location.pathname === '/ai-chat' ? 'aiChat' : location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : (history.readState()?.screen ?? 'login'))
     }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
-  }, [])
-  const handlePreferences = (draft) => {
-    setAccount(draft.account)
-    setNickname(draft.nickname)
-    setAgreeAll(draft.agreeAll)
-    history.replaceState({ screen: 'onboarding' }, '', location.href)
-    history.pushState({ account: draft.account, nickname: draft.nickname }, '', '/onboarding/preferences')
-    setScreen('preferences')
-  }
-  const [reopenAccountModal, setReopenAccountModal] = useState(false)
-
-  const handleAccountContinue = (selectedAccount) => {
-    setAccount(selectedAccount)
-    setScreen('consent')
-  }
-  const handleChangeAccount = () => {
-    setReopenAccountModal(true)
-    setScreen('login')
-  }
-
+  }, [history])
   const handleMainNavigate = (path, currentProfile = { account, nickname, preferences, alerts }) => {
     if ((!['/', '/home', '/mypage', '/recipe', '/recipes', '/ai-chat', '/shopping', '/fridge'].includes(path) && !/^\/(recipe|fridge)\/[^/]+$/.test(path)) || path === location.pathname) return
     setAIChatOpen(false)
@@ -129,7 +105,7 @@ export default function App() {
     setNickname(currentProfile.nickname)
     setPreferences(currentProfile.preferences)
     setAlerts(currentProfile.alerts)
-    history.replaceState({ ...history.state, ...currentProfile, cartItems, registeredMaterials, inventory }, '', location.href)
+    history.replaceState({ ...history.readState(), ...currentProfile, cartItems, registeredMaterials, inventory }, '', location.href)
     history.pushState({ ...currentProfile, cartItems, registeredMaterials, inventory, fromApp: true, fromFridge: location.pathname === '/fridge', fromRecipe: isNotificationOpen || isAIChatOpen || location.pathname.startsWith('/fridge/') || ['/recipe', '/recipes', '/ai-chat'].includes(location.pathname) }, '', path)
     setScreen(path.startsWith('/fridge/') ? 'ingredientDetail' : path === '/fridge' ? 'fridge' : path === '/shopping' ? 'shopping' : path === '/ai-chat' ? 'aiChat' : path.startsWith('/recipe/') ? 'recipeDetail' : path === '/mypage' ? 'mypage' : ['/recipe', '/recipes'].includes(path) ? 'recipe' : 'home')
   }
@@ -137,7 +113,7 @@ export default function App() {
   const handleStartRegistration = (selectedItems) => {
     if (!selectedItems.length) return
     const profile = { account, nickname, preferences, alerts, cartItems, registeredMaterials, inventory }
-    history.replaceState({ ...history.state, ...profile }, '', location.href)
+    history.replaceState({ ...history.readState(), ...profile }, '', location.href)
     history.pushState({ ...profile, fromShopping: true, registrationId: crypto.randomUUID(), registrationItems: selectedItems }, '', '/shopping/register')
     setScreen('register')
   }
@@ -146,7 +122,7 @@ export default function App() {
     setScreen('register')
   }
   const handleRegisterToFridge = (materials) => {
-    if (!materials.length || (history.state?.source !== 'fridge-direct' && materials.some((item) => !cartItems.some((cart) => cart.id === item.id)))) throw new Error('장바구니에서 등록할 재료를 다시 선택해주세요.')
+    if (!materials.length || (history.readState()?.source !== 'fridge-direct' && materials.some((item) => !cartItems.some((cart) => cart.id === item.id)))) throw new Error('장바구니에서 등록할 재료를 다시 선택해주세요.')
     const nextInventory = registerMaterials(inventory, materials)
     const registered = [...registeredMaterials, ...materials.map((item) => ({ ...item, ingredientName: item.ingredientName.trim(), consumedBeforeRegistration: Math.max(0, (createMockInventory()[item.ingredientId] ?? 0) + registeredMaterials.filter((entry) => entry.ingredientId === item.ingredientId).reduce((total, entry) => total + Number(entry.purchaseAmount) * entry.inventoryPerUnit, 0) - (inventory[item.ingredientId] ?? 0)), registeredAt: new Date().toISOString() }))]
     const remaining = cartItems.filter((item) => !materials.some((material) => material.id === item.id))
@@ -159,20 +135,20 @@ export default function App() {
   const handleOpenPackageSolution = (item) => {
     if (!item) return
     const profile = { account, nickname, preferences, alerts, cartItems, registeredMaterials, inventory }
-    history.replaceState({ ...history.state, ...profile }, '', location.href)
+    history.replaceState({ ...history.readState(), ...profile }, '', location.href)
     history.pushState({ ...profile, fromShopping: true, fromRegistration: location.pathname === '/shopping/register', packageItemId: item.id, solutionId: crypto.randomUUID() }, '', '/shopping/package-solution')
     setScreen('packageSolution')
   }
   const handleOpenPackageMap = (packageView) => {
-    const state = { ...history.state, cartItems, registeredMaterials, inventory, packageView }
+    const state = { ...history.readState(), cartItems, registeredMaterials, inventory, packageView }
     history.replaceState(state, '', location.href)
     history.pushState({ ...state, fromPackageSolution: true }, '', '/shopping/package-solution/map')
     setScreen('packageMap')
   }
   const handleClosePackageMap = () => {
-    if (history.state?.fromPackageSolution) history.back()
+    if (history.readState()?.fromPackageSolution) history.back()
     else {
-      history.replaceState({ ...history.state }, '', '/shopping/package-solution')
+      history.replaceState({ ...history.readState() }, '', '/shopping/package-solution')
       setScreen('packageSolution')
     }
   }
@@ -195,36 +171,28 @@ export default function App() {
     } else handleMainNavigate(action.type === 'recipe' ? '/recipe/' + action.recipeId : '/fridge')
   }
   const renderScreen = () => {
-  if (screen === 'ingredientDetail') return <IngredientDetail key={location.pathname} itemId={location.pathname.slice('/fridge/'.length)} inventory={inventory} registeredMaterials={registeredMaterials} onNavigate={handleMainNavigate} onBack={() => { if (history.state?.fromFridge) history.back(); else handleMainNavigate('/fridge') }} onBrowseRecipes={(name) => { setRecipeListState({ tab: 'recipes', category: 'AI 추천 메뉴', query: name, search: name }); handleMainNavigate('/recipe') }} />
-  if (screen === 'packageMap') return <Suspense fallback={<div role="status" className="mx-auto flex h-dvh max-w-app items-center justify-center bg-white text-sm text-[#007451]">지도를 불러오는 중…</div>}><PackageMap key={history.state?.solutionId ?? 'empty'} item={cartItems.find((item) => item.id === history.state?.packageItemId)} selectedProductId={history.state?.packageView?.selectedProductId} onBack={handleClosePackageMap} onReplace={handleReplaceCartItem} /></Suspense>
-  if (screen === 'packageSolution') return <PackageSolution key={history.state?.solutionId ?? 'empty'} item={cartItems.find((item) => item.id === history.state?.packageItemId)} onBack={() => { if (history.state?.fromShopping) history.back(); else handleMainNavigate('/shopping') }} onClose={() => { if (history.state?.fromRegistration) history.back(); else handleMainNavigate('/shopping') }} onOpenMap={handleOpenPackageMap} onReplace={handleReplaceCartItem} />
-  if (screen === 'register') return <MaterialRegister key={history.state?.registrationId ?? 'empty'} source={history.state?.source} items={history.state?.registrationItems ?? []} onNavigate={handleMainNavigate} onBack={() => { if (history.state?.fromShopping || history.state?.source === 'fridge-direct') history.back(); else handleMainNavigate('/shopping') }} onRegister={handleRegisterToFridge} onOpenPackageSolution={handleOpenPackageSolution} />
-  if (screen === 'recipeDetail') return <RecipeDetail registeredMaterials={registeredMaterials} inventory={inventory} onDeductStock={handleStockDeduction} key={location.pathname} recipeId={location.pathname.slice('/recipe/'.length)} savedIds={savedIds} onToggleSave={toggleRecipeSave} onBack={() => { if (history.state?.fromRecipe) history.back(); else handleMainNavigate('/recipe') }} />
+  if (screen === 'ingredientDetail') return <IngredientDetail key={location.pathname} itemId={location.pathname.slice('/fridge/'.length)} inventory={inventory} registeredMaterials={registeredMaterials} onNavigate={handleMainNavigate} onBack={() => { if (history.readState()?.fromFridge) history.back(); else handleMainNavigate('/fridge') }} onBrowseRecipes={(name) => { setRecipeListState({ tab: 'recipes', category: 'AI 추천 메뉴', query: name, search: name }); handleMainNavigate('/recipe') }} />
+  if (screen === 'packageMap') return <Suspense fallback={<div role="status" className="mx-auto flex h-dvh max-w-app items-center justify-center bg-white text-sm text-[#007451]">지도를 불러오는 중…</div>}><PackageMap key={history.readState()?.solutionId ?? 'empty'} item={cartItems.find((item) => item.id === history.readState()?.packageItemId)} selectedProductId={history.readState()?.packageView?.selectedProductId} onBack={handleClosePackageMap} onReplace={handleReplaceCartItem} /></Suspense>
+  if (screen === 'packageSolution') return <PackageSolution key={history.readState()?.solutionId ?? 'empty'} item={cartItems.find((item) => item.id === history.readState()?.packageItemId)} onBack={() => { if (history.readState()?.fromShopping) history.back(); else handleMainNavigate('/shopping') }} onClose={() => { if (history.readState()?.fromRegistration) history.back(); else handleMainNavigate('/shopping') }} onOpenMap={handleOpenPackageMap} onReplace={handleReplaceCartItem} />
+  if (screen === 'register') return <MaterialRegister key={history.readState()?.registrationId ?? 'empty'} source={history.readState()?.source} items={history.readState()?.registrationItems ?? []} onNavigate={handleMainNavigate} onBack={() => { if (history.readState()?.fromShopping || history.readState()?.source === 'fridge-direct') history.back(); else handleMainNavigate('/shopping') }} onRegister={handleRegisterToFridge} onOpenPackageSolution={handleOpenPackageSolution} />
+  if (screen === 'recipeDetail') return <RecipeDetail registeredMaterials={registeredMaterials} inventory={inventory} onDeductStock={handleStockDeduction} key={location.pathname} recipeId={location.pathname.slice('/recipe/'.length)} savedIds={savedIds} onToggleSave={toggleRecipeSave} onBack={() => { if (history.readState()?.fromRecipe) history.back(); else handleMainNavigate('/recipe') }} />
   if (screen === 'aiChat') return <AIChat onNavigate={handleMainNavigate} messages={chatMessages} onMessagesChange={setChatMessages} />
   // Main navigation 화면에서만 AI 버튼을 한 번 렌더링합니다.
   const showMainAssistant = ['/', '/home', '/recipe', '/recipes', '/mypage', '/shopping', '/fridge'].includes(location.pathname) && ['home', 'recipe', 'mypage', 'shopping', 'fridge'].includes(screen)
   if (showMainAssistant) return (
     <div className="relative mx-auto h-dvh w-full max-w-app">
-      {screen === 'fridge' && <Fridge inventory={inventory} registeredMaterials={registeredMaterials} onNavigate={handleMainNavigate} onAdd={handleDirectRegistration} registrationMessage={history.state?.registrationMessage} />}
+      {screen === 'fridge' && <Fridge inventory={inventory} registeredMaterials={registeredMaterials} onNavigate={handleMainNavigate} onAdd={handleDirectRegistration} registrationMessage={history.readState()?.registrationMessage} />}
       {screen === 'home' && <Home onNavigate={handleMainNavigate} />}
       {screen === 'recipe' && <Recipe key={recipeSearchKey} onNavigate={handleMainNavigate} savedIds={savedIds} onToggleSave={toggleRecipeSave} listState={recipeListState} onListStateChange={setRecipeListState} />}
-      {screen === 'mypage' && <MyPage onDraftChange={syncMyPageDraft} onNavigate={handleMainNavigate} onEditProfile={handleEditProfile} initialAlerts={alerts} account={account} nickname={nickname} initialPreferences={preferences} />}
-      {screen === 'shopping' && <Cart items={cartItems} onItemsChange={setCartItems} onOpenPackageSolution={handleOpenPackageSolution} onStartRegistration={handleStartRegistration} registrationMessage={history.state?.registrationMessage} onNavigate={handleMainNavigate} onBack={() => { if (history.state?.fromApp) history.back(); else handleMainNavigate('/') }} />}
+      {screen === 'mypage' && <MyPage onSaveSettings={handleSaveSettings} onSignOut={onSignOut} onNavigate={handleMainNavigate} onEditProfile={handleEditProfile} initialAlerts={alerts} account={account} nickname={nickname} initialPreferences={preferences} />}
+      {screen === 'shopping' && <Cart items={cartItems} onItemsChange={setCartItems} onOpenPackageSolution={handleOpenPackageSolution} onStartRegistration={handleStartRegistration} registrationMessage={history.readState()?.registrationMessage} onNavigate={handleMainNavigate} onBack={() => { if (history.readState()?.fromApp) history.back(); else handleMainNavigate('/') }} />}
       <div hidden={isAIChatOpen || isNotificationOpen}><FloatingAssistant onClick={() => { setNotificationOpen(false); setAIChatOpen(true) }} /></div>
       {isAIChatOpen && <AIChat sheet onClose={closeAIChat} onNavigate={handleMainNavigate} messages={chatMessages} onMessagesChange={setChatMessages} />}
     </div>
   )
   if (screen === 'edit') return <EditProfilePage account={account} nickname={nickname} initialPreferences={preferences} onCancel={handleCancelEdit} onSave={handleSaveProfile} />
 
-  if (screen === 'preferences') return <PreferenceSetupPage onComplete={handleComplete} account={account} nickname={nickname} />
-
-  if (screen === 'onboarding') {
-    return <OnboardingPage onContinue={handlePreferences} initialNickname={nickname} initialAgreeAll={agreeAll} account={account} onBack={() => setScreen('consent')} onChangeAccount={handleChangeAccount} />
-  }
-
-  return screen === 'consent'
-    ? <AccountConsentPage onContinue={(selectedAccount) => { setAccount(selectedAccount); setScreen('onboarding') }} account={account} onChangeAccount={handleChangeAccount} />
-    : <LoginPage initialModalOpen={reopenAccountModal} account={account} onAccountContinue={handleAccountContinue} />
+  return <Home onNavigate={handleMainNavigate} />
   }
   return <NotificationContext.Provider value={{ open: openNotifications, isOpen: isNotificationOpen, unreadCount: notifications.filter((item) => !item.isRead).length }}>
     {renderScreen()}

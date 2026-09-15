@@ -1,9 +1,10 @@
 import AccountAvatar from '../common/AccountAvatar'
+import { isValidNickname } from '../../utils/profileValidation'
 import verifiedIcon from '../../assets/icons/onboarding-shield.svg'
 import smileIcon from '../../assets/icons/nickname-smile.svg'
 
 export default function LinkedAccountCard({ account, nickname, onNicknameChange, onChangeAccount }) {
-  const isValid = nickname.trim().length > 0
+  const isValid = isValidNickname(nickname)
   return (
     <section aria-labelledby="linked-account-title" className="flex flex-col gap-3.5 rounded-2xl border border-[#f1f5f9] bg-white p-[17px] shadow-xs">
       <div className="flex items-center justify-between border-b border-[#f1f5f9] pb-[11px] text-xs leading-4">
@@ -28,7 +29,7 @@ export default function LinkedAccountCard({ account, nickname, onNicknameChange,
         </div>
         <div className="flex min-h-10 items-center gap-2 rounded-xl border border-[#e2e8f0] bg-[#f8fafc]/80 px-3 focus-within:ring-2 focus-within:ring-[#047857]">
           <img src={smileIcon} alt="" className="size-3 shrink-0" />
-          <input id="onboarding-nickname" value={nickname} onChange={(event) => onNicknameChange(event.target.value)} aria-invalid={!isValid} aria-describedby="nickname-status" className="min-w-0 flex-1 bg-transparent py-2.5 text-xs leading-4 text-[#1e293b] outline-none" />
+          <input id="onboarding-nickname" value={nickname} maxLength={12} placeholder="한글·영문·숫자 2~12자" onChange={(event) => onNicknameChange(event.target.value)} aria-invalid={!isValid} aria-describedby="nickname-status" className="min-w-0 flex-1 bg-transparent py-2.5 text-xs leading-4 text-[#1e293b] outline-none" />
           <span id="nickname-status" aria-live="polite" className={`shrink-0 rounded-md border px-2 py-0.5 text-[11px] ${isValid ? 'border-[#a7f3d0]/80 bg-[#ecfdf5] text-[#047857]' : 'border-red-200 bg-red-50 text-red-600'}`}>{isValid ? '사용 가능' : '입력 필요'}</span>
         </div>
       </div>
