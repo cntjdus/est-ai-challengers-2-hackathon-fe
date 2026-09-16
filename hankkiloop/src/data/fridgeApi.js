@@ -43,7 +43,7 @@ export async function saveInventoryItem(client, row, draft) {
   if (error) throw error
 }
 export function planDeductions(registrations, selected) {
-  const available = registrations.map(m => ({ ...m, left: Number(m.purchaseAmount) })).sort((a,b) => (a.expiryDate || '9999').localeCompare(b.expiryDate || '9999'))
+  const available = registrations.map(m => ({ ...m, left: Number(m.purchaseAmount), rawLeft: Number(m.dbRow?.quantity ?? m.purchaseAmount) })).sort((a,b) => (a.expiryDate || '9999').localeCompare(b.expiryDate || '9999'))
   const changes = []
   for (const item of selected) {
     let remaining = Number(item.deduct)
@@ -51,8 +51,12 @@ export function planDeductions(registrations, selected) {
     for (const lot of available.filter(m => m.ingredientId === item.id)) {
       const take = Math.min(lot.left, remaining)
       if (take <= 0) continue
-      lot.left = Number((lot.left - take).toFixed(4)); remaining = Number((remaining - take).toFixed(4))
-      changes.push({ id: lot.id, delta: -take, status: lot.left > 0 ? 'active' : 'consumed', request_id: crypto.randomUUID() })
+      const factor = lot.conversionFactor ?? 1
+      const rawTake = Math.min(lot.rawLeft, Number((take / factor).toFixed(4)))
+      if (rawTake <= 0) throw new Error('차감량이 저장 단위의 최소 수량보다 작아요. 차감량을 늘려주세요.')
+      lot.rawLeft = Number((lot.rawLeft - rawTake).toFixed(4))
+      lot.left = Number((lot.rawLeft * factor).toFixed(4)); remaining = Number((remaining - take).toFixed(4))
+      changes.push({ id: lot.id, delta: -rawTake, status: lot.left > 0 ? 'active' : 'consumed', request_id: crypto.randomUUID() })
     }
     if (remaining > 0) throw new Error('현재 재고가 부족합니다. 냉장고를 새로고침해주세요.')
   }

@@ -1,4 +1,5 @@
 import { getDaysUntilExpiry, expiryLabel } from './inventory'
+import { koreaDate } from './notificationDate'
 
 export function getNotificationCategoryByDaysLeft(daysLeft) {
   if (!Number.isFinite(daysLeft)) return null
@@ -29,7 +30,7 @@ export function createMenuNotifications(inventory, now = new Date(), recipes = [
     const id = recipe.id
     if (!recipe) return []
     return [{
-      id: 'menu:' + id + ':' + now.toLocaleDateString('en-CA'),
+      id: 'menu:' + id + ':' + koreaDate(now),
       category: 'menu', mealType: index ? 'dinner' : 'lunch', icon: index ? 'moon' : 'sun',
       badge: index ? '오늘의 저메추' : '오늘의 점메추', title: recipe.title,
       description: recipe.ingredientSummary + '로 간단한 한 끼를 준비해보세요.',

@@ -15,7 +15,7 @@ function formatAmount(ingredient, ratio) {
   return Number(value.toFixed(2)) + ingredient.unit
 }
 
-export default function RecipeDetail({ recipes = [], recipeId, savedIds, onToggleSave, onBack, inventory, registeredMaterials, onDeductStock, onAddShopping, onOpenShopping, allergyNotice }) {
+export default function RecipeDetail({ recipes = [], recipeId, savedIds, onToggleSave, onBack, inventory, registeredMaterials, onDeductStock, onAddShopping, onOpenShopping, allergyNotice, saveLoading = false, busySaveIds = [] }) {
   const recipe = recipes.find((item) => item.id === recipeId)
   const [servings, setServings] = useState(recipe?.servings ?? 1)
   const [expanded, setExpanded] = useState(false)
@@ -46,7 +46,7 @@ export default function RecipeDetail({ recipes = [], recipeId, savedIds, onToggl
   const saved = savedIds.includes(recipe.id)
   return (
     <div className="relative mx-auto flex h-dvh w-full max-w-app flex-col overflow-hidden bg-[#fafcfb] text-[#111827]">
-      <EditProfileHeader onBack={onBack} title="" plain action={<button type="button" aria-label={recipe.title + ' 스크랩'} aria-pressed={saved} onClick={() => onToggleSave(recipe.id)} className="flex size-10 items-center justify-center rounded-full"><Bookmark aria-hidden="true" className="size-6" fill={saved ? 'currentColor' : 'none'} /></button>} />
+      <EditProfileHeader onBack={onBack} title="" plain action={<button type="button" disabled={saveLoading || busySaveIds.includes(recipe.id)} aria-label={recipe.title + ' 스크랩'} aria-pressed={saved} onClick={() => onToggleSave(recipe.id)} className="flex size-10 items-center justify-center rounded-full"><Bookmark aria-hidden="true" className="size-6" fill={saved ? 'currentColor' : 'none'} /></button>} />
       <main aria-label="레시피 상세" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-24">
         <h1 className="text-2xl font-bold leading-9">{recipe.title}</h1>
         {allergyNotice && <p className="mt-3 text-xs text-amber-800">{allergyNotice}</p>}

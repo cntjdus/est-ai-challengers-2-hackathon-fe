@@ -1,24 +1,27 @@
+import { canonicalQuantity, unitFactor, unitLabels as conversionUnits } from './unitConversion.js'
 // Matches the existing public recipes / recipe_ingredients / recipe_steps schema.
 const unitLabels = { ea: '개', pack: '팩', bundle: '묶음', tbsp: '큰술', tsp: '작은술' }
 const stockKey = (foodId, unit) => `food:${foodId}:${unit}`
 const normalize = (name) => name.trim().replace(/\s+/g, '').toLowerCase()
 const round = (n) => Number(n.toFixed(4))
 
-export async function loadRecipeCatalog(client) {
+export async function loadRecipeCatalog(client, userId) {
   const results = await Promise.all([
     client.from('recipes').select('*, recipe_ingredients(*), recipe_steps(*)').order('created_at', { ascending: false }),
-    client.from('food_items').select('id,name,is_active'),
+    client.from('food_items').select('id,name,is_active,base_unit'),
     client.from('food_aliases').select('food_id,alias'),
+    userId ? client.from('hk_food_unit_conversions').select('food_id,unit,base_quantity').eq('user_id', userId) : Promise.resolve({ data: [] }),
   ])
   for (const result of results) if (result.error) throw result.error
-  const [rows, foods, aliases] = results.map(result => result.data ?? [])
+  const [rows, foods, aliases, conversions] = results.map(result => result.data ?? [])
   const recipes = rows.map(row => {
     const ingredients = (row.recipe_ingredients ?? []).map(item => {
       const food = foods.find(f => f.id === item.food_id)
       if (!food) throw new Error('레시피 재료 정보를 확인할 수 없습니다.')
-      return { id: stockKey(food.id, item.unit), foodId: food.id, name: food.name,
-        quantity: Number(item.quantity), dbUnit: item.unit, unit: unitLabels[item.unit] ?? item.unit,
-        optional: item.is_optional, note: item.note, step: ['g', 'ml'].includes(item.unit) ? 1 : 0.25,
+      const converted = canonicalQuantity(food, item.quantity, item.unit, conversions)
+      return { id: stockKey(food.id, converted.unit), foodId: food.id, name: food.name,
+        quantity: converted.quantity, dbUnit: converted.unit, unit: unitLabels[converted.unit] ?? converted.unit,
+        optional: item.is_optional, note: item.note, step: ['g', 'ml'].includes(converted.unit) ? 1 : 0.25,
         storageType: '보유 재고 기준', storageLabel: '냉장고 보관중' }
     })
     // Multiple entries for one food/unit must share one stock budget.
@@ -35,10 +38,10 @@ export async function loadRecipeCatalog(client) {
       ingredients: grouped, ingredientSummary: grouped.map(i => i.name).join(', '), tools: [],
       steps: [...(row.recipe_steps ?? [])].sort((a,b) => a.step_no - b.step_no).map(s => ({ step: s.step_no, description: s.instruction })) }
   })
-  return { recipes, foods, aliases }
+  return { recipes, foods, aliases, conversions }
 }
 
-export function recipeStock(registrations, foods, aliases) {
+export function recipeStock(registrations, foods, aliases, conversions = []) {
   const names = new Map()
   for (const { id, name } of foods) names.set(normalize(name), new Set([...(names.get(normalize(name)) ?? []), id]))
   for (const { food_id, alias } of aliases) names.set(normalize(alias), new Set([...(names.get(normalize(alias)) ?? []), food_id]))
@@ -48,9 +51,13 @@ export function recipeStock(registrations, foods, aliases) {
     if (!row) return lot
     const candidates = names.get(normalize(row.display_name))
     const foodId = row.food_id ?? (candidates?.size === 1 ? [...candidates][0] : null)
-    const id = foodId ? stockKey(foodId, row.unit) : lot.ingredientId
-    inventory[id] = round((inventory[id] ?? 0) + Number(row.quantity))
-    return { ...lot, ingredientId: id, unit: unitLabels[row.unit] ?? row.unit }
+    const food = foods.find(f => f.id === foodId)
+    const converted = canonicalQuantity(food, row.quantity, row.unit, conversions)
+    const id = foodId ? stockKey(foodId, converted.unit) : lot.ingredientId
+    inventory[id] = round((inventory[id] ?? 0) + converted.quantity)
+    return { ...lot, ingredientId: id, purchaseAmount: converted.quantity, conversionFactor: converted.factor,
+      unitFactors: converted.unit === food?.base_unit ? Object.fromEntries(Object.keys(conversionUnits).map(u => [u, unitFactor(food, u, conversions)])) : { [row.unit]: 1 },
+      unit: unitLabels[converted.unit] ?? converted.unit }
   })
   lots.database = true
   return { inventory, registrations: lots }

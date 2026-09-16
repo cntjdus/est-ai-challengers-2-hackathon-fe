@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import App from '../App'
+import { disablePush } from '../data/pushApi'
 import LoginPage from '../pages/LoginPage'
 import OnboardingPage from '../pages/OnboardingPage'
 import PreferenceSetupPage from '../pages/PreferenceSetupPage'
@@ -135,6 +136,7 @@ export default function AuthGate() {
 
   const signOut = async () => {
     if (!supabase) return
+    await disablePush(supabase, session?.user.id)
     const { error: failure } = await supabase.auth.signOut({ scope: 'local' })
     if (failure) throw failure
     liveUserId.current = null

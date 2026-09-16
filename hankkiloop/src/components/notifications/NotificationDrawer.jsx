@@ -4,7 +4,7 @@ import useModalDialog from '../../hooks/useModalDialog'
 import NotificationCard from './NotificationCard'
 const categories = [{ id: 'all', label: '전체' }, { id: 'expiry', label: '소비임박' }, { id: 'menu', label: '메뉴 추천' }, { id: 'coach', label: '냉큼이' }]
 
-export default function NotificationDrawer({ notifications, onClose, onRead, onMarkAllRead, onAction }) {
+export default function NotificationDrawer({ notifications, onClose, onRead, onMarkAllRead, onAction, loading = false, error = '', onRetry }) {
   const dialogRef = useRef(null)
   const panelRef = useRef(null)
   const gesture = useRef(null)
@@ -57,9 +57,9 @@ export default function NotificationDrawer({ notifications, onClose, onRead, onM
           <div className="flex items-center gap-2"><h1 id="notification-title" className="text-xl font-bold text-[#252824]">알림</h1><span data-testid="unread-count" className="rounded-full border border-[#ffe0e6] bg-[#fff3f5] px-2 py-1 text-[11px] font-semibold text-[#f14a6c]">새 알림 {unread}</span><button data-no-drag type="button" aria-label="알림 닫기" onClick={close} className="ml-auto flex size-8 items-center justify-center rounded-full text-[#a1a1aa]"><X aria-hidden="true" className="size-4" /></button></div>
           <div aria-label="알림 분류" className="mt-4 flex gap-1.5 overflow-x-auto pb-1">{categories.map((item) => <button data-no-drag type="button" key={item.id} aria-pressed={category === item.id} onClick={() => setCategory(item.id)} className="shrink-0 rounded-full bg-[#f4f4f4] px-2 py-1.5 text-[10px] font-semibold text-[#686964] aria-pressed:bg-[#007450] aria-pressed:text-white">{item.id === 'expiry' && <span aria-hidden="true" className="mr-1 text-[#f59e0b]">●</span>}{item.label}</button>)}</div>
         </header>
-        <div className="flex shrink-0 justify-end bg-white px-4 py-3"><button data-no-drag type="button" disabled={!unread} onClick={onMarkAllRead} className="text-[11px] font-semibold text-[#858580] underline underline-offset-2 disabled:opacity-40"><span aria-hidden="true" className="mr-1 text-[#10b981]">●</span>모두 읽음 처리</button></div>
+        <div className="flex shrink-0 justify-end bg-white px-4 py-3"><button data-no-drag type="button" disabled={loading || !unread} onClick={onMarkAllRead} className="text-[11px] font-semibold text-[#858580] underline underline-offset-2 disabled:opacity-40"><span aria-hidden="true" className="mr-1 text-[#10b981]">●</span>모두 읽음 처리</button></div>
         <div data-notification-content className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 pt-4 pb-6">
-          {visible.map((item) => <NotificationCard key={item.id} notification={item} onRead={onRead} onAction={onAction} />)}
+          {loading && <p role="status">읽음 상태를 불러오는 중…</p>}{error && <p role="alert">{error}<button onClick={onRetry}>다시 불러오기</button></p>}{!loading && visible.map((item) => <NotificationCard key={item.id} notification={item} onRead={onRead} onAction={onAction} />)}
           {!visible.length && <p role="status" className="py-10 text-center text-xs text-[#858580]">해당 알림이 없어요.</p>}
         </div>
       </section>

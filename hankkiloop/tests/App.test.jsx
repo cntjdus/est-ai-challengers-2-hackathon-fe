@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import App from '../src/App'
+vi.mock('../src/data/userStateApi', () => ({ loadSavedRecipes: vi.fn().mockResolvedValue([]), loadNotificationReads: vi.fn().mockResolvedValue([]) }))
 vi.mock('../src/data/fridgeApi', async importOriginal => ({ ...await importOriginal(), loadInventory: vi.fn().mockResolvedValue({ inventory: {}, registrations: Object.assign([], { database: true }) }) }))
 
 const profile = {

@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import App from '../src/App'
+vi.mock('../src/data/userStateApi', () => ({ loadSavedRecipes: vi.fn().mockResolvedValue([]), loadNotificationReads: vi.fn().mockResolvedValue([]) }))
 import { loadShopping } from '../src/data/shoppingApi'
 vi.mock('../src/data/fridgeApi', async original => ({ ...await original(), loadInventory: vi.fn().mockResolvedValue({ inventory: {}, registrations: Object.assign([], { database: true }) }) }))
 vi.mock('../src/data/recipeApi', async original => ({ ...await original(), loadRecipeCatalog: vi.fn().mockResolvedValue({ recipes: [], foods: [], aliases: [] }) }))

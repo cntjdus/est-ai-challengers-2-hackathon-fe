@@ -1,4 +1,5 @@
 import { recipes } from './recipes'
+import { koreaDate } from './notificationDate'
 export const createMockInventory = () => Object.fromEntries(recipes.flatMap((recipe) => recipe.ingredients.filter((item) => item.inFridge).map((item) => [item.id, item.stock])))
 export const inventoryIngredients = [...new Map(recipes.flatMap((recipe) => recipe.ingredients.filter((item) => item.inFridge).map((item) => [item.id, item]))).values()]
 export function deductInventory(inventory, selected) {
@@ -37,7 +38,7 @@ function dateNumber(value) {
   return new Date(result).toISOString().slice(0, 10) === value ? result : NaN
 }
 function todayString(now = new Date()) {
-  return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-')
+  return koreaDate(now)
 }
 export function getDaysUntilExpiry(expiryDate, now = new Date()) {
   const difference = dateNumber(expiryDate) - dateNumber(todayString(now))

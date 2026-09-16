@@ -7,8 +7,9 @@ import DietaryPreferencesSection from '../components/preferenceSetup/DietaryPref
 import AvoidIngredientsSection from '../components/preferenceSetup/AvoidIngredientsSection'
 import SmartCareCard from '../components/mypage/SmartCareCard'
 import BottomNavigation from '../components/common/BottomNavigation'
+import PushSettings from '../components/mypage/PushSettings'
 
-export default function MyPage({ account, nickname = '자취새싹이', initialPreferences, onEditProfile, initialAlerts, onNavigate, onSaveSettings, onSignOut }) {
+export default function MyPage({ account, nickname = '자취새싹이', initialPreferences, onEditProfile, initialAlerts, onNavigate, onSaveSettings, onSignOut, unitSettings }) {
   const { preferences, dietaryProps, avoidProps, allergyProps } = usePreferences(initialPreferences)
   const [expirationAlert, setExpirationAlert] = useState(initialAlerts?.expirationAlert ?? true)
   const [recipeSuggestionAlert, setRecipeSuggestionAlert] = useState(initialAlerts?.recipeSuggestionAlert ?? false)
@@ -49,6 +50,8 @@ export default function MyPage({ account, nickname = '자취새싹이', initialP
           <SmartCareCard expirationAlert={expirationAlert} onExpirationChange={setExpirationAlert} recipeSuggestionAlert={recipeSuggestionAlert} onRecipeChange={setRecipeSuggestionAlert} />
           <button type="button" onClick={() => runAction(() => onSaveSettings({ preferences, alerts: { expirationAlert, recipeSuggestionAlert } }), '설정을 저장했어요.')} className="min-h-12 w-full rounded-xl bg-[#006c49] px-4 py-3 text-sm text-white">{busy ? '처리 중…' : '설정 저장'}</button>
           </fieldset>
+          <PushSettings userId={account.id} />
+          {unitSettings}
           {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
           {notice && <p role="status" className="text-sm text-[#006c49]">{notice}</p>}
           <button type="button" disabled={busy} onClick={() => runAction(onSignOut, '')} className="min-h-11 rounded-xl border border-[#cbd5e1] px-4 py-3 text-sm text-[#64748b]">로그아웃</button>

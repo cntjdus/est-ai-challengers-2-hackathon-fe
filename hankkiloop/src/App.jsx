@@ -2,7 +2,10 @@ import { loadRecipeCatalog, recipeStock } from './data/recipeApi'
 import { createUserHistory } from './auth/navigation'
 import NotificationDrawer from './components/notifications/NotificationDrawer'
 import { NotificationContext } from './components/notifications/NotificationContext'
-import { createExpiryNotifications, createMenuNotifications, markNotificationAsRead, markAllNotificationsAsRead } from './data/notifications'
+import { createExpiryNotifications, createMenuNotifications } from './data/notifications'
+import useUserState from './hooks/useUserState'
+import { isPushEnabled } from './data/pushApi'
+import UnitConversionSettings from './components/mypage/UnitConversionSettings'
 import IngredientDetail from './pages/IngredientDetail'
 import Fridge from './pages/Fridge'
 
@@ -24,6 +27,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 
 export default function App({ initialProfile, onSaveProfile, onSignOut }) {
+  useEffect(() => { isPushEnabled(supabase, initialProfile.account.id).catch(() => {}) }, [initialProfile.account.id])
   const history = useMemo(() => createUserHistory(initialProfile.account.id), [initialProfile.account.id])
   const [screen, setScreen] = useState(() => location.pathname.startsWith('/fridge/') ? 'ingredientDetail' : location.pathname === '/fridge' ? 'fridge' : location.pathname === '/shopping/package-solution/map' ? 'packageMap' : location.pathname === '/shopping/package-solution' ? 'packageSolution' : location.pathname === '/shopping/register' ? 'register' : location.pathname === '/shopping' ? 'shopping' : location.pathname === '/ai-chat' ? 'aiChat' : location.pathname.startsWith('/recipe/') ? 'recipeDetail' : (location.pathname === '/recipe' || location.pathname === '/recipes') ? 'recipe' : ['/', '/home'].includes(location.pathname) ? 'home' : location.pathname === '/mypage/edit' ? 'edit' : location.pathname === '/mypage' ? 'mypage' : location.pathname === '/onboarding/preferences' ? 'preferences' : 'login')
   const [cartItems, setCartItems] = useState([])
@@ -69,8 +73,13 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
     document.querySelector('[aria-label="AI 채팅 열기"]')?.focus({ preventScroll: true })
   }, [isAIChatOpen])
   const [isNotificationOpen, setNotificationOpen] = useState(false)
-  const [notificationReadIds, setNotificationReadIds] = useState([])
-  const [notificationNow] = useState(() => new Date())
+  const userState = useUserState(supabase, initialProfile.account.id)
+  const { savedIds, readIds: notificationReadIds } = userState
+  const [notificationNow, setNotificationNow] = useState(() => new Date())
+  useEffect(() => {
+    const timer = setInterval(() => setNotificationNow(new Date()), 60000)
+    return () => clearInterval(timer)
+  }, [])
   const [recipeSearchKey, setRecipeSearchKey] = useState(0)
   const openNotifications = useCallback(() => { setAIChatOpen(false); setNotificationOpen(true) }, [])
   const closeNotifications = useCallback(() => setNotificationOpen(false), [])
@@ -109,15 +118,15 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
   const [recipeReload, setRecipeReload] = useState(0)
   useEffect(() => {
     let active = true
-    loadRecipeCatalog(supabase).then(result => {
+    loadRecipeCatalog(supabase, initialProfile.account.id).then(result => {
       if (active) { setCatalog(result); setRecipeError('') }
     }).catch(error => {
       if (active) setRecipeError('레시피를 불러오지 못했어요. ' + error.message)
     }).finally(() => { if (active) setRecipeLoading(false) })
     return () => { active = false }
-  }, [recipeReload])
+  }, [recipeReload, initialProfile.account.id])
   const retryRecipes = () => { setRecipeLoading(true); setRecipeReload(n => n + 1) }
-  const recipeInventory = useMemo(() => recipeStock(registeredMaterials, catalog.foods, catalog.aliases), [registeredMaterials, catalog])
+  const recipeInventory = useMemo(() => recipeStock(registeredMaterials, catalog.foods, catalog.aliases, catalog.conversions), [registeredMaterials, catalog])
   const pendingDeduction = useRef(null)
   const handleStockDeduction = async (selected) => {
     const key = JSON.stringify(selected)
@@ -142,23 +151,22 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
     pendingRemoval.current = null
     handleMainNavigate('/fridge')
   }
-  const handleMarkRead = (id) => setNotificationReadIds((ids) => markNotificationAsRead(ids, id))
-  const handleMarkAllRead = () => setNotificationReadIds((ids) => markAllNotificationsAsRead(ids, notifications))
+  const handleMarkRead = (id) => userState.markRead([id])
+  const handleMarkAllRead = () => userState.markRead(notifications.map(n => n.id))
   useEffect(() => { history.replaceState({ ...history.readState(), inventory, registeredMaterials, cartItems }, '', location.href) }, [inventory, registeredMaterials, cartItems, screen, history])
-  const [savedIds, setSavedIds] = useState([])
   const [recipeListState, setRecipeListState] = useState({})
-  const toggleRecipeSave = (id) => setSavedIds((previous) => previous.includes(id) ? previous.filter((item) => item !== id) : [...previous, id])
+  const toggleRecipeSave = userState.toggleSave
   const [account, setAccount] = useState(initialProfile.account)
   const [nickname, setNickname] = useState(initialProfile.nickname)
   const [preferences, setPreferences] = useState(initialProfile.preferences)
   const personalizedRecipes = useMemo(() => personalizeRecipes(catalog.recipes, preferences, recipeInventory.inventory), [catalog.recipes, preferences, recipeInventory.inventory])
-  const notifications = [...createExpiryNotifications(buildFridgeItems(inventory, registeredMaterials, notificationNow), notificationNow), ...createMenuNotifications(recipeInventory.inventory, notificationNow, personalizedRecipes)].map((item) => ({ ...item, isRead: notificationReadIds.includes(item.id) }))
+  const [alerts, setAlerts] = useState(initialProfile.alerts)
+  const notifications = [...(alerts?.expirationAlert ? createExpiryNotifications(buildFridgeItems(inventory, registeredMaterials, notificationNow), notificationNow) : []), ...(alerts?.recipeSuggestionAlert ? createMenuNotifications(recipeInventory.inventory, notificationNow, personalizedRecipes) : [])].map((item) => ({ ...item, isRead: notificationReadIds.includes(item.id) }))
   const handleAddShopping = async (recipe, servings, requestId) => {
     if (inventoryError || !inventoryReady) throw new Error('냉장고 정보를 먼저 다시 불러와 주세요.')
     await addRecipeShopping(supabase, recipe, servings, recipeInventory.inventory, requestId)
     await reloadCart()
   }
-  const [alerts, setAlerts] = useState(initialProfile.alerts)
   const handleSaveSettings = async (draft) => {
     const saved = await onSaveProfile({ nickname, preferences: draft.preferences, alerts: draft.alerts })
     setPreferences(saved.preferences)
@@ -251,7 +259,7 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
   if (screen === 'register' && history.readState()?.source !== 'fridge-direct' && (cartLoading || cartError)) return <div className="p-6"><p role={cartError ? 'alert' : 'status'}>{cartError || '장바구니를 불러오는 중…'}</p><button onClick={() => reloadCart().catch(() => {})}>다시 불러오기</button></div>
   if (screen === 'register') return <MaterialRegister allowPackageOptions={false} key={history.readState()?.registrationId ?? 'empty'} source={history.readState()?.source} items={cartItems.filter(item => history.readState()?.registrationItems?.some(selected => selected.id === item.id))} onNavigate={handleMainNavigate} onBack={() => { if (history.readState()?.fromShopping || history.readState()?.source === 'fridge-direct') history.back(); else handleMainNavigate('/shopping') }} onRegister={handleRegisterToFridge} />
   if (screen === 'recipeDetail' && (recipeLoading || recipeError)) return <div className="mx-auto max-w-app p-8"><p role={recipeError ? 'alert' : 'status'}>{recipeLoading ? '레시피를 불러오는 중…' : recipeError}</p>{!recipeLoading && <button onClick={retryRecipes}>다시 불러오기</button>}<button onClick={() => handleMainNavigate('/recipe')}>레시피 목록으로</button></div>
-  if (screen === 'recipeDetail') return <RecipeDetail onAddShopping={handleAddShopping} onOpenShopping={() => handleMainNavigate('/shopping')} allergyNotice={allergyNotice} recipes={personalizedRecipes} registeredMaterials={recipeInventory.registrations} inventory={recipeInventory.inventory} onDeductStock={handleStockDeduction} key={location.pathname} recipeId={location.pathname.slice('/recipe/'.length)} savedIds={savedIds} onToggleSave={toggleRecipeSave} onBack={() => { if (history.readState()?.fromRecipe) history.back(); else handleMainNavigate('/recipe') }} />
+  if (screen === 'recipeDetail') return <RecipeDetail saveLoading={userState.loading} busySaveIds={userState.busyIds} onAddShopping={handleAddShopping} onOpenShopping={() => handleMainNavigate('/shopping')} allergyNotice={allergyNotice} recipes={personalizedRecipes} registeredMaterials={recipeInventory.registrations} inventory={recipeInventory.inventory} onDeductStock={handleStockDeduction} key={location.pathname} recipeId={location.pathname.slice('/recipe/'.length)} savedIds={savedIds} onToggleSave={toggleRecipeSave} onBack={() => { if (history.readState()?.fromRecipe) history.back(); else handleMainNavigate('/recipe') }} />
   if (screen === 'aiChat') return <AIChat onNavigate={handleMainNavigate} messages={chatMessages} onMessagesChange={setChatMessages} />
   // Main navigation 화면에서만 AI 버튼을 한 번 렌더링합니다.
   const showMainAssistant = ['/', '/home', '/recipe', '/recipes', '/mypage', '/shopping', '/fridge'].includes(location.pathname) && ['home', 'recipe', 'mypage', 'shopping', 'fridge'].includes(screen)
@@ -259,8 +267,8 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
     <div className="relative mx-auto h-dvh w-full max-w-app">
       {screen === 'fridge' && <Fridge inventory={inventory} registeredMaterials={registeredMaterials} onNavigate={handleMainNavigate} onAdd={handleDirectRegistration} registrationMessage={history.readState()?.registrationMessage} />}
       {screen === 'home' && <Home recommendedRecipes={personalizedRecipes.slice(0, 3)} recipeLoading={recipeLoading} recipeError={recipeError} onRetryRecipes={retryRecipes} fridgeItems={buildFridgeItems(inventory, registeredMaterials)} nickname={nickname} onNavigate={handleMainNavigate} />}
-      {screen === 'recipe' && <Recipe allergyNotice={allergyNotice} recipes={personalizedRecipes} loading={recipeLoading} error={recipeError} onRetry={retryRecipes} key={recipeSearchKey} onNavigate={handleMainNavigate} savedIds={savedIds} onToggleSave={toggleRecipeSave} listState={recipeListState} onListStateChange={setRecipeListState} />}
-      {screen === 'mypage' && <MyPage onSaveSettings={handleSaveSettings} onSignOut={onSignOut} onNavigate={handleMainNavigate} onEditProfile={handleEditProfile} initialAlerts={alerts} account={account} nickname={nickname} initialPreferences={preferences} />}
+      {screen === 'recipe' && <Recipe saveLoading={userState.loading} busySaveIds={userState.busyIds} allergyNotice={allergyNotice} recipes={personalizedRecipes} loading={recipeLoading} error={recipeError} onRetry={retryRecipes} key={recipeSearchKey} onNavigate={handleMainNavigate} savedIds={savedIds} onToggleSave={toggleRecipeSave} listState={recipeListState} onListStateChange={setRecipeListState} />}
+      {screen === 'mypage' && <MyPage unitSettings={<UnitConversionSettings client={supabase} userId={account.id} foods={catalog.foods} conversions={catalog.conversions ?? []} loading={recipeLoading} error={recipeError} onReload={retryRecipes} />} onSaveSettings={handleSaveSettings} onSignOut={onSignOut} onNavigate={handleMainNavigate} onEditProfile={handleEditProfile} initialAlerts={alerts} account={account} nickname={nickname} initialPreferences={preferences} />}
       {screen === 'shopping' && <Cart loading={cartLoading} error={cartError} onRetry={() => reloadCart().catch(() => {})} items={cartItems} onItemsChange={handleCartChange} onStartRegistration={handleStartRegistration} registrationMessage={history.readState()?.registrationMessage} onNavigate={handleMainNavigate} onBack={() => { if (history.readState()?.fromApp) history.back(); else handleMainNavigate('/') }} />}
       <div hidden={isAIChatOpen || isNotificationOpen}><FloatingAssistant onClick={() => { setNotificationOpen(false); setAIChatOpen(true) }} /></div>
       {isAIChatOpen && <AIChat sheet onClose={closeAIChat} onNavigate={handleMainNavigate} messages={chatMessages} onMessagesChange={setChatMessages} />}
@@ -271,8 +279,9 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
   return <Home recommendedRecipes={personalizedRecipes.slice(0, 3)} recipeLoading={recipeLoading} recipeError={recipeError} onRetryRecipes={retryRecipes} fridgeItems={buildFridgeItems(inventory, registeredMaterials)} nickname={nickname} onNavigate={handleMainNavigate} />
   }
   return <NotificationContext.Provider value={{ open: openNotifications, isOpen: isNotificationOpen, unreadCount: notifications.filter((item) => !item.isRead).length }}>
+    {userState.error && <div role="alert" className="fixed inset-x-4 top-2 z-[100] mx-auto max-w-sm rounded-xl border bg-white p-3 shadow-lg">{userState.error}<button type="button" className="ml-2 underline" onClick={userState.reload}>다시 불러오기</button></div>}
     {inventoryLoading ? <div role="status" className="mx-auto max-w-app p-10 text-center">냉장고 정보를 불러오는 중…</div> : inventoryError && !inventoryReady ? <div role="alert" className="mx-auto max-w-app p-8"><p>{inventoryError}</p><button type="button" onClick={() => reloadInventory().catch(() => {})} className="mt-4 rounded-xl bg-[#006c49] px-5 py-3 text-white">다시 불러오기</button></div> : renderScreen()}
     {inventoryError && inventoryReady && <div role="alert" className="fixed inset-x-4 bottom-20 z-50 mx-auto max-w-sm rounded-xl border bg-white p-4 shadow-lg"><p>{inventoryError}</p><button type="button" onClick={() => reloadInventory().catch(() => {})}>다시 불러오기</button></div>}
-    {isNotificationOpen && <NotificationDrawer notifications={notifications} onClose={closeNotifications} onRead={handleMarkRead} onMarkAllRead={handleMarkAllRead} onAction={handleNotificationAction} />}
+    {isNotificationOpen && <NotificationDrawer loading={userState.loading} error={userState.error} onRetry={userState.reload} notifications={notifications} onClose={closeNotifications} onRead={handleMarkRead} onMarkAllRead={handleMarkAllRead} onAction={handleNotificationAction} />}
   </NotificationContext.Provider>
 }

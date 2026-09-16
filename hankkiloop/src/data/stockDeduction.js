@@ -1,6 +1,6 @@
 import { buildFridgeItems, inventoryIngredients, storageLabels } from './inventory'
 
-export const customIngredientUnits = ['g', 'ml', '개', '스푼', '인분', '대', '모', '팩']
+export const customIngredientUnits = ['g', 'ml', '개', '큰술', '작은술', '묶음', '대', '모', '팩']
 const normalizeName = (name) => name.trim().replace(/\s+/g, '').toLocaleLowerCase()
 export const roundAmount = (value) => Number(value.toFixed(3))
 
@@ -19,7 +19,9 @@ export function createCustomDeduction({ name, amount, unit }, rows, inventory, r
   const source = inventoryIngredients.find((item) => item.id === ingredientId)
   const units = candidates.filter((item) => item.unit === unit)
   const conversions = [...new Set(units.map((item) => 1 / item.displayPerUnit))]
-  const inventoryPerUnit = source?.unit === unit ? 1 : conversions.length === 1 ? conversions[0] : null
+  const dbUnit = ({ 개: 'ea', 모: 'ea', 대: 'ea', 팩: 'pack', 묶음: 'bundle', 큰술: 'tbsp', 작은술: 'tsp' })[unit] ?? unit
+  const knownFactors = [...new Set(registeredMaterials.filter(m => m.ingredientId === ingredientId).map(m => m.unitFactors?.[dbUnit]).filter(f => f > 0))]
+  const inventoryPerUnit = knownFactors.length === 1 ? knownFactors[0] : source?.unit === unit ? 1 : conversions.length === 1 ? conversions[0] : null
   const matched = ingredientId && inventoryPerUnit && Number.isFinite(inventoryPerUnit)
   if (matched && rows.some((row) => (row.inventoryId ?? row.id) === ingredientId)) throw new Error('같은 냉장고 재료가 이미 목록에 있어요.')
   const stock = matched ? roundAmount((inventory[ingredientId] ?? 0) / inventoryPerUnit) : null
