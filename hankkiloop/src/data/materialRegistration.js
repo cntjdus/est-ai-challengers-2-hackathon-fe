@@ -30,11 +30,11 @@ export function createRegistrationDraft(items) {
   return items.map((item) => {
     const ingredient = recipes.flatMap((recipe) => recipe.ingredients).find((entry) => entry.id === item.ingredientId)
     return {
-      id: item.id, ingredientId: item.ingredientId, ingredientName: ingredient?.name ?? item.shortName,
+      id: item.id, shoppingItemId: item.dbRow ? item.id : null, expectedCount: item.quantity, ingredientId: item.ingredientId, ingredientName: item.dbRow ? item.shortName : ingredient?.name ?? item.shortName,
       purchaseAmount: String(item.packageAmount * item.quantity), unit: item.amountUnit,
-      inventoryPerUnit: item.inventoryQuantity / item.packageAmount, storageType: 'freezer',
-      purchaseDate: today, expiryDate: calculateExpiryDate('freezer', today), expiryAutomatic: true,
-      storageGuide: storageGuides.freezer, recognizedFromPhoto: false,
+      inventoryPerUnit: 1, storageType: 'fridge',
+      purchaseDate: today, expiryDate: '', expiryAutomatic: false,
+      storageGuide: storageGuides.fridge, recognizedFromPhoto: false,
     }
   })
 }

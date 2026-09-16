@@ -114,7 +114,7 @@ export function buildDatabaseItems(registrations, now) {
     const daysLeft = getDaysUntilExpiry(m.expiryDate, now)
     const storedDays = m.purchaseDate ? Math.max(0, -getDaysUntilExpiry(m.purchaseDate, now)) : 0
     const duration = daysLeft === null ? 1 : Math.max(1, storedDays + daysLeft)
-    const lot = { id: m.id, ingredientId: m.ingredientId, name: m.ingredientName, amount: m.purchaseAmount, unit: m.unit, displayPerUnit: 1, purchaseDate: m.purchaseDate, expiryDate: m.expiryDate, storageType: m.storageType }
+    const lot = { id: m.id, ingredientId: m.ingredientId, name: m.ingredientName, image: m.image, amount: m.purchaseAmount, unit: m.unit, displayPerUnit: 1, purchaseDate: m.purchaseDate, expiryDate: m.expiryDate, storageType: m.storageType }
     return { ...lot, ...ingredientDetailFields(lot, daysLeft, storedDays, duration), daysLeft, storedDays,
       status: daysLeft === null ? 'unknown' : daysLeft < 0 ? 'expired' : daysLeft <= 2 ? 'urgent' : daysLeft <= 5 ? 'warning' : 'relaxed',
       freshnessPercent: daysLeft === null ? 0 : Math.max(0, Math.min(100, Math.round(daysLeft / duration * 100))),

@@ -7,17 +7,19 @@ export function toRegistrationPayload(materials, ids) {
     const quantity = Number(m.purchaseAmount)
     if (!Number.isFinite(quantity) || quantity <= 0 || quantity >= 1e9 || Math.abs(quantity * 10000 - Math.round(quantity * 10000)) > 0.0001) throw new Error('수량은 0보다 크고 10억 미만, 소수점 네 자리 이내로 입력해주세요.')
     if (!dbUnits[m.unit]) throw new Error('지원하지 않는 단위입니다: ' + m.unit)
-    return { id: ids[index], display_name: m.ingredientName.trim(), quantity, unit: dbUnits[m.unit], storage_type: m.storageType, purchased_on: m.purchaseDate, expiry_date: m.expiryDate }
+    return { id: ids[index], display_name: m.ingredientName.trim(), quantity, unit: dbUnits[m.unit], storage_type: m.storageType, purchased_on: m.purchaseDate, expiry_date: m.expiryDate, ...(m.shoppingItemId ? { shopping_item_id: m.shoppingItemId, expected_count: m.expectedCount } : {}) }
   })
 }
-export function mapInventoryRows(rows) {
+export function mapInventoryRows(rows, foods = []) {
   // Recipe quantities are only matched when their units agree. Never guess grams per piece.
   const inventory = {}, registrations = []
   for (const row of rows) {
     const match = ingredients.find(i => (i.name === row.display_name || (i.name === '계란' && row.display_name === '달걀')) && dbUnits[i.unit] === row.unit)
     const id = match?.id ?? `db:${row.display_name}:${row.unit}`
     inventory[id] = (inventory[id] ?? 0) + Number(row.quantity)
-    registrations.push({ id: row.id, dbRow: row, ingredientId: id, ingredientName: row.display_name, purchaseAmount: Number(row.quantity), inventoryPerUnit: 1, unit: match?.unit ?? uiUnits[row.unit] ?? row.unit, purchaseDate: row.purchased_on ?? '', expiryDate: row.tracking_date ?? '', storageType: row.storage_type })
+    const food = foods.find(food => food.id === row.food_id && food.is_active !== false)
+    const image = /^https?:\/\//i.test(food?.image_path ?? '') ? food.image_path : null
+    registrations.push({ id: row.id, dbRow: row, ingredientId: id, ingredientName: row.display_name, image, purchaseAmount: Number(row.quantity), inventoryPerUnit: 1, unit: match?.unit ?? uiUnits[row.unit] ?? row.unit, purchaseDate: row.purchased_on ?? '', expiryDate: row.tracking_date ?? '', storageType: row.storage_type })
   }
   registrations.database = true
   return { inventory, registrations }
@@ -25,7 +27,10 @@ export function mapInventoryRows(rows) {
 export async function loadInventory(client, userId) {
   const { data, error } = await client.from('inventory_overview').select('*').eq('user_id', userId).eq('status', 'active').order('created_at')
   if (error) throw error
-  return mapInventoryRows(data)
+  if (!data?.length) return mapInventoryRows([])
+  const foods = await client.from('food_items').select('id,image_path,is_active').eq('is_active', true)
+  if (foods.error) throw foods.error
+  return mapInventoryRows(data, foods.data ?? [])
 }
 export async function registerInventory(client, payload) {
   const { error } = await client.rpc('hk_register_inventory_batch', { p_items: payload })

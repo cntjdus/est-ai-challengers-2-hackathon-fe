@@ -30,7 +30,7 @@ it('shows a retryable catalog error and then an empty DB', async () => {
   mount()
   expect(await screen.findByRole('alert')).toBeTruthy()
   fireEvent.click(screen.getByRole('button',{name:'다시 불러오기'}))
-  expect(await screen.findByText('아직 등록된 레시피가 없습니다.')).toBeTruthy()
+  expect(await screen.findByText('등록된 레시피가 없거나 설정에 따라 모두 제외되었습니다.')).toBeTruthy()
   expect(screen.queryByText('제육볶음')).toBeNull()
 })
 it('saves an edit, reloads it from DB, and requires confirmation for discard', async () => {

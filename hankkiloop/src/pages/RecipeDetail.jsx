@@ -15,7 +15,7 @@ function formatAmount(ingredient, ratio) {
   return Number(value.toFixed(2)) + ingredient.unit
 }
 
-export default function RecipeDetail({ recipes = [], recipeId, savedIds, onToggleSave, onBack, inventory, registeredMaterials, onDeductStock }) {
+export default function RecipeDetail({ recipes = [], recipeId, savedIds, onToggleSave, onBack, inventory, registeredMaterials, onDeductStock, onAddShopping, onOpenShopping, allergyNotice }) {
   const recipe = recipes.find((item) => item.id === recipeId)
   const [servings, setServings] = useState(recipe?.servings ?? 1)
   const [expanded, setExpanded] = useState(false)
@@ -24,16 +24,32 @@ export default function RecipeDetail({ recipes = [], recipeId, savedIds, onToggl
   const [isStockSheetOpen, setIsStockSheetOpen] = useState(false)
   const tipRef = useRef(null)
   const [activeStep, setActiveStep] = useState(0)
+  const [shoppingNotice, setShoppingNotice] = useState('')
+  const [addingShopping, setAddingShopping] = useState(false)
+  const shoppingRequest = useRef(null)
+  const shoppingLock = useRef(false)
+  const addShopping = async () => {
+    if (shoppingLock.current) return
+    shoppingLock.current = true; setAddingShopping(true); setShoppingNotice('')
+    const key = recipe.id + ':' + servings
+    if (shoppingRequest.current?.key !== key) shoppingRequest.current = { key, id: crypto.randomUUID() }
+    try {
+      await onAddShopping(recipe, servings, shoppingRequest.current.id)
+      setShoppingNotice('부족 재료를 장바구니에 저장했어요.')
+    } catch (error) { setShoppingNotice(error.message) }
+    finally { shoppingLock.current = false; setAddingShopping(false) }
+  }
   const handleCompleteCooking = () => {
     setIsStockSheetOpen(true)
   }
-  if (!recipe) return <div className="mx-auto flex h-dvh w-full max-w-app flex-col bg-[#fafcfb]"><EditProfileHeader onBack={onBack} title="" plain /><main className="p-6 text-center"><h1 className="text-xl font-bold">레시피를 찾을 수 없습니다</h1><button onClick={onBack} className="mt-6 rounded-xl bg-[#1b4535] px-5 py-3 text-white">레시피 목록으로</button></main></div>
+  if (!recipe) return <div className="mx-auto flex h-dvh w-full max-w-app flex-col bg-[#fafcfb]"><EditProfileHeader onBack={onBack} title="" plain /><main className="p-6 text-center"><h1 className="text-xl font-bold">레시피를 찾을 수 없습니다</h1><p className="mt-3 text-sm">등록되지 않았거나 알레르기·비선호 설정으로 제외된 레시피입니다.</p><button onClick={onBack} className="mt-6 rounded-xl bg-[#1b4535] px-5 py-3 text-white">레시피 목록으로</button></main></div>
   const saved = savedIds.includes(recipe.id)
   return (
     <div className="relative mx-auto flex h-dvh w-full max-w-app flex-col overflow-hidden bg-[#fafcfb] text-[#111827]">
       <EditProfileHeader onBack={onBack} title="" plain action={<button type="button" aria-label={recipe.title + ' 스크랩'} aria-pressed={saved} onClick={() => onToggleSave(recipe.id)} className="flex size-10 items-center justify-center rounded-full"><Bookmark aria-hidden="true" className="size-6" fill={saved ? 'currentColor' : 'none'} /></button>} />
       <main aria-label="레시피 상세" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-24">
         <h1 className="text-2xl font-bold leading-9">{recipe.title}</h1>
+        {allergyNotice && <p className="mt-3 text-xs text-amber-800">{allergyNotice}</p>}
         <p id="recipe-description" className={`mt-2 text-sm leading-6 text-[#374151] ${expanded ? '' : 'line-clamp-3'}`}>{recipe.description}</p>
         <button type="button" aria-expanded={expanded} aria-controls="recipe-description" onClick={() => setExpanded(!expanded)} className="mt-1 text-sm font-semibold text-[#3478ff]">{expanded ? '접기' : '더보기'}</button>
         <dl className="mt-6 grid grid-cols-3 rounded-2xl border border-[#e2ebe5] bg-[#f3f7f5] py-4 text-center">
@@ -59,6 +75,11 @@ export default function RecipeDetail({ recipes = [], recipeId, savedIds, onToggl
         {completed && <p role="status" className="mt-2 text-center text-xs text-[#64748b]">{completionNotice}</p>}
       </main>
       <footer className="shrink-0 border-t border-[#e5e7eb] bg-white px-4 pt-4 pb-[calc(16px+env(safe-area-inset-bottom))]">
+        {onAddShopping && <div className="mb-3">
+          <button type="button" disabled={addingShopping || completed} onClick={addShopping} className="w-full rounded-xl border border-[#006c49] p-3 text-sm text-[#006c49] disabled:opacity-50">{addingShopping ? '저장 중…' : '부족한 필수 재료 장바구니 담기'}</button>
+          {shoppingNotice && <p role="status" className="mt-2 text-xs">{shoppingNotice}</p>}
+          <button type="button" onClick={onOpenShopping} className="mt-2 text-xs underline">장바구니 보기</button>
+        </div>}
         <button type="button" disabled={completed} onClick={handleCompleteCooking} className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#1b4535] text-base font-bold text-white shadow-lg disabled:bg-[#527466]"><Check aria-hidden="true" className="size-6 text-[#6ee7b7]" />{completed ? '요리 완료했어요' : '요리 완료 (재고 차감)'}</button>
 
       </footer>
