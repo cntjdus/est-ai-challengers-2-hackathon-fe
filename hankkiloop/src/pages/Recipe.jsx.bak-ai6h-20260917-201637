@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import HomeHeader from '../components/home/HomeHeader'
 import BottomNavigation from '../components/common/BottomNavigation'
 import RecipeCard from '../components/recipe/RecipeCard'
-import AIRecipeRecommendation from '../components/recipe/AIRecipeRecommendation'
 import character from '../assets/hankkiloop-character.png'
 import savingsCharacter from '../assets/recipe-savings-character.jpg'
 import { CirclePlus, Flame, Search } from 'lucide-react'
@@ -31,8 +30,6 @@ const matchesSearch = (recipe, search) => {
 
 // Database catalog is supplied by App.
 export default function Recipe({
-  userId = '',
-  fridgeItems = [],
   recipes = [],
   aiRecommendationIds = [],
   loading = false,
@@ -148,11 +145,10 @@ export default function Recipe({
             <div className="flex items-center justify-between gap-2"><h2 className="flex items-center gap-1 text-sm text-[#161c25]"><Flame aria-hidden="true" className="size-4 text-[#f97316]" />자취생 인기 간편 조합</h2><span className="shrink-0 text-[11px] text-[#839087]">터치하여 바로 탐색</span></div>
             <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-5 pb-1">{quickRecipes.map((name) => <button key={name} type="button" onClick={() => selectQuickRecipe(name)} className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#eef1f1] bg-white px-3 py-2 text-sm text-[#3c4a42] shadow-sm"><CirclePlus aria-hidden="true" className="size-3.5 text-[#006c49]" />{name}</button>)}</div>
           </section>
-          <AIRecipeRecommendation
-            userId={userId}
-            fridgeItems={fridgeItems}
-            recipes={recipes}
-          />
+          <section className="mt-7 flex min-w-0 items-center gap-3 rounded-2xl border border-[#dbe4f3] bg-[#eff4ff] p-4">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#006c49]/15"><img src={savingsCharacter} alt="" className="size-9 rounded-lg object-contain" /></div>
+            <div className="min-w-0"><h2 className="text-[17px] leading-6 text-[#161c25]">예상 식비 절약 &amp; 소진 효과</h2><p className="mt-0.5 text-sm leading-[19px] text-[#3c4a42]">추천 메뉴로 냉장고 속 <span className="text-[#006c49]">{savingsIngredients.join(', ')}</span>를 알뜰하게 비워낼 수 있어요!</p></div>
+          </section>
         </>}
 
         <section className="mt-7">

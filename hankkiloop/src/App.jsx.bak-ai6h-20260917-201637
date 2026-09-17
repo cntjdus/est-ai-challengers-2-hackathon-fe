@@ -780,8 +780,6 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
           )}
           {screen === "recipe" && (
             <Recipe
-              userId={account.id}
-              fridgeItems={buildFridgeItems(inventory, registeredMaterials, notificationNow)}
               saveLoading={userState.loading}
               busySaveIds={userState.busyIds}
               allergyNotice={allergyNotice}

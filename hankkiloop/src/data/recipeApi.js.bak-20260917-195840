@@ -34,7 +34,7 @@ export async function loadRecipeCatalog(client, userId) {
       servings: Number(row.base_servings), minutes: row.cooking_minutes ?? '—',
       difficulty: { easy: '초급', normal: '보통', hard: '어려움' }[row.difficulty] ?? '미등록',
       source: row.source_name ?? '출처 미등록', sourceType: row.source_type ?? 'other', sourceUrl: row.source_url,
-      image: row.image_path, tags: Array.isArray(row.tags) ? row.tags : [], tag: (row.tags ?? []).join(' · '), benefit: '필요량과 냉장고 재고 비교',
+      image: row.image_path, tag: (row.tags ?? []).join(' · '), benefit: '필요량과 냉장고 재고 비교',
       ingredients: grouped, ingredientSummary: grouped.map(i => i.name).join(', '), tools: [],
       steps: [...(row.recipe_steps ?? [])].sort((a,b) => a.step_no - b.step_no).map(s => ({ step: s.step_no, description: s.instruction })) }
   })

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import HomeHeader from '../components/home/HomeHeader'
 import BottomNavigation from '../components/common/BottomNavigation'
 import RecipeCard from '../components/recipe/RecipeCard'
-import AIRecipeRecommendation from '../components/recipe/AIRecipeRecommendation'
+import { sendChatMessage } from '../data/chatApi'
 import character from '../assets/hankkiloop-character.png'
 import savingsCharacter from '../assets/recipe-savings-character.jpg'
 import { CirclePlus, Flame, Search } from 'lucide-react'
@@ -29,10 +29,79 @@ const matchesSearch = (recipe, search) => {
     .includes(keyword)
 }
 
+const AI_RECOMMENDATION_CACHE_TTL = 10 * 60 * 1000
+
+const fridgeItemLabel = (item) => {
+  const amount =
+    Number.isFinite(Number(item?.amount)) && item?.unit
+      ? ` ${Number(item.amount)}${item.unit}`
+      : ''
+  const expiry =
+    Number.isFinite(item?.daysLeft)
+      ? item.daysLeft < 0
+        ? ' (소비기한 지남)'
+        : item.daysLeft === 0
+          ? ' (D-DAY)'
+          : ` (D-${item.daysLeft})`
+      : ''
+
+  return `${item?.name ?? ''}${amount}${expiry}`.trim()
+}
+
+const recommendationSignature = (fridgeItems = [], recipes = []) => {
+  const fridge = fridgeItems
+    .filter((item) => item?.name)
+    .map((item) => `${item.name}:${item.amount ?? ''}:${item.unit ?? ''}:${item.daysLeft ?? ''}`)
+    .sort()
+    .join('|')
+  const catalog = recipes
+    .map((recipe) => `${recipe?.id ?? ''}:${recipe?.title ?? ''}`)
+    .sort()
+    .join('|')
+
+  return `${fridge}::${catalog}`
+}
+
+const hashSignature = (value) => {
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0).toString(36)
+}
+
+const buildAiRecommendationPrompt = (fridgeItems = [], recipes = []) => {
+  const fridgeSummary = fridgeItems
+    .filter((item) => item?.name && item?.daysLeft !== -Infinity)
+    .slice()
+    .sort((a, b) => {
+      const aDays = Number.isFinite(a?.daysLeft) ? a.daysLeft : 9999
+      const bDays = Number.isFinite(b?.daysLeft) ? b.daysLeft : 9999
+      return aDays - bDays
+    })
+    .slice(0, 18)
+    .map(fridgeItemLabel)
+    .join(', ')
+    .slice(0, 520)
+
+  const recipeTitles = recipes
+    .map((recipe) => recipe?.title)
+    .filter(Boolean)
+    .slice(0, 15)
+    .join(', ')
+    .slice(0, 240)
+
+  return [
+    `현재 냉장고 재료: ${fridgeSummary || '등록된 재료 없음'}`,
+    `한끼루프 DB 레시피 후보: ${recipeTitles || '후보 없음'}`,
+    '위 냉장고 재료를 최대한 활용해 1인 가구가 만들기 좋은 메뉴 2~3개를 추천해줘.',
+    '소비기한이 임박한 재료를 우선하고, DB 후보와 맞는 메뉴가 있으면 후보의 메뉴명을 그대로 우선 사용해.',
+    "출력은 반드시 '메뉴명, 메뉴명, 메뉴명 — 짧은 추천 이유' 형태의 한 줄만 작성해. 번호, 불릿, 마크다운은 쓰지 마.",
+  ].join('\n')
+}
 // Database catalog is supplied by App.
 export default function Recipe({
-  userId = '',
-  fridgeItems = [],
   recipes = [],
   aiRecommendationIds = [],
   loading = false,
@@ -51,6 +120,11 @@ export default function Recipe({
   const [search, setSearch] = useState(listState.search ?? '')
   const [draftSearch, setDraftSearch] = useState(listState.search ?? '')
   const [source, setSource] = useState(listState.category ?? 'AI 추천 메뉴')
+  const [aiRecommendation, setAiRecommendation] = useState('')
+  const [aiRecommendationLoading, setAiRecommendationLoading] = useState(false)
+  const [aiRecommendationError, setAiRecommendationError] = useState('')
+  const aiRecommendationRequestRef = useRef(0)
+  const aiRecommendationKey = recommendationSignature(fridgeItems, recipes)
 
   useEffect(() => {
     onListStateChange({ tab, search, category: source })
@@ -99,6 +173,85 @@ export default function Recipe({
     return baseRecipes.filter((recipe) => matchesSearch(recipe, search))
   }, [tab, recipes, savedIds, sourceRecipes, search])
 
+  const requestAiRecommendation = async ({ force = false } = {}) => {
+    if (!fridgeItems.length) {
+      setAiRecommendation('')
+      setAiRecommendationError('')
+      setAiRecommendationLoading(false)
+      return
+    }
+
+    const requestId = ++aiRecommendationRequestRef.current
+    const cacheKey = `hankkiloop:ai-recipe:${hashSignature(aiRecommendationKey)}`
+
+    if (!force && typeof window !== 'undefined') {
+      try {
+        const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null')
+        if (
+          cached?.answer &&
+          Number.isFinite(cached?.savedAt) &&
+          Date.now() - cached.savedAt < AI_RECOMMENDATION_CACHE_TTL
+        ) {
+          setAiRecommendation(cached.answer)
+          setAiRecommendationError('')
+          setAiRecommendationLoading(false)
+          return
+        }
+      } catch {
+        // 잘못된 캐시는 무시하고 새로 추천한다.
+      }
+    }
+
+    setAiRecommendationLoading(true)
+    setAiRecommendationError('')
+
+    try {
+      const prompt = buildAiRecommendationPrompt(fridgeItems, recipes)
+      const result = await sendChatMessage([{ role: 'user', content: prompt }])
+
+      if (requestId !== aiRecommendationRequestRef.current) return
+
+      const answer = result.answer.trim()
+      setAiRecommendation(answer)
+
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem(
+            cacheKey,
+            JSON.stringify({ answer, savedAt: Date.now() }),
+          )
+        } catch {
+          // 저장 공간 문제는 추천 자체에 영향을 주지 않는다.
+        }
+      }
+    } catch (failure) {
+      if (requestId !== aiRecommendationRequestRef.current) return
+      setAiRecommendationError(
+        failure?.message || 'AI 추천을 불러오지 못했어요.',
+      )
+    } finally {
+      if (requestId === aiRecommendationRequestRef.current) {
+        setAiRecommendationLoading(false)
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!fridgeItems.length) {
+      setAiRecommendation('')
+      setAiRecommendationError('')
+      setAiRecommendationLoading(false)
+      return undefined
+    }
+
+    requestAiRecommendation()
+
+    return () => {
+      aiRecommendationRequestRef.current += 1
+    }
+    // aiRecommendationKey가 바뀌는 경우에만 새 추천을 요청한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiRecommendationKey])
   const consumableIngredients = suggestedIngredients.filter((ingredient) =>
     recipes.some((recipe) => recipe.ingredientSummary?.includes(ingredient)),
   )
@@ -148,11 +301,43 @@ export default function Recipe({
             <div className="flex items-center justify-between gap-2"><h2 className="flex items-center gap-1 text-sm text-[#161c25]"><Flame aria-hidden="true" className="size-4 text-[#f97316]" />자취생 인기 간편 조합</h2><span className="shrink-0 text-[11px] text-[#839087]">터치하여 바로 탐색</span></div>
             <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-5 pb-1">{quickRecipes.map((name) => <button key={name} type="button" onClick={() => selectQuickRecipe(name)} className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#eef1f1] bg-white px-3 py-2 text-sm text-[#3c4a42] shadow-sm"><CirclePlus aria-hidden="true" className="size-3.5 text-[#006c49]" />{name}</button>)}</div>
           </section>
-          <AIRecipeRecommendation
-            userId={userId}
-            fridgeItems={fridgeItems}
-            recipes={recipes}
-          />
+          <section className="mt-7 flex min-w-0 items-start gap-3 rounded-2xl border border-[#dbe4f3] bg-[#eff4ff] p-4">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#006c49]/15">
+              <img src={savingsCharacter} alt="" className="size-9 rounded-lg object-contain" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="text-[17px] leading-6 text-[#161c25]">
+                  AI 레시피 추천! 냉큼이가 추천해요~
+                </h2>
+                {fridgeItems.length > 0 && (
+                  <button
+                    type="button"
+                    disabled={aiRecommendationLoading}
+                    onClick={() => requestAiRecommendation({ force: true })}
+                    className="shrink-0 rounded-lg border border-[#b9d6cc] bg-white/80 px-2 py-1 text-[11px] font-medium text-[#006c49] disabled:opacity-50"
+                  >
+                    {aiRecommendationLoading ? '추천 중' : '다시 추천'}
+                  </button>
+                )}
+              </div>
+
+              <p className="mt-1 text-sm leading-[20px] text-[#3c4a42]">
+                {!fridgeItems.length
+                  ? '냉장고에 재료를 등록하면 보유 재료를 바탕으로 메뉴를 추천해드려요.'
+                  : aiRecommendationLoading
+                    ? '냉큼이가 냉장고 재료와 소비기한을 살펴보고 있어요...'
+                    : aiRecommendation ||
+                      '냉장고 재료를 바탕으로 추천 메뉴를 준비하고 있어요.'}
+              </p>
+
+              {aiRecommendationError && (
+                <p role="alert" className="mt-1.5 text-[11px] leading-4 text-[#b45309]">
+                  {aiRecommendationError}
+                </p>
+              )}
+            </div>
+          </section>
         </>}
 
         <section className="mt-7">
