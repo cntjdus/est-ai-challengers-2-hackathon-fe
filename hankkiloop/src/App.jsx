@@ -31,6 +31,7 @@ import {
   saveShoppingChanges,
   checkoutShopping,
 } from "./data/shoppingApi";
+import { replaceShoppingPackage } from "./data/packageApi";
 import { personalizeRecipes, allergyNotice } from "./data/personalization";
 import AIChat from "./pages/AIChat";
 import FloatingAssistant from "./components/common/FloatingAssistant";
@@ -135,6 +136,44 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
       cartBusy.current = false;
     }
   };
+  const handleReplacePackage = async (shoppingItemId, product) => {
+  if (cartBusy.current) {
+    throw new Error(
+      "장바구니를 처리 중입니다. 잠시 후 다시 시도해주세요.",
+    );
+  }
+
+  cartBusy.current = true;
+
+  try {
+    await replaceShoppingPackage(
+      supabase,
+      shoppingItemId,
+      product,
+    );
+
+    await reloadCart();
+
+    history.replaceState(
+      {
+        ...history.readState(),
+        packageItem: undefined,
+        packageView: undefined,
+        selectedStoreId: undefined,
+      },
+      "",
+      "/shopping/register",
+    );
+
+    setScreen("register");
+  } catch (error) {
+    await reloadCart().catch(() => {});
+    throw error;
+  } finally {
+    cartBusy.current = false;
+  }
+};
+
   const [registeredMaterials, setRegisteredMaterials] = useState(() =>
     Object.assign([], { database: true }),
   );
@@ -639,7 +678,7 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
           onBack={() => history.back()}
           onClose={() => history.back()}
           onOpenMap={handleOpenPackageMap}
-          onReplace={() => { throw new Error("실제 소포장 상품 교체는 아직 지원되지 않습니다."); }}
+          onReplace={() => { handleReplacePackage}}
         />
       );
     if (screen === "packageMap")
@@ -648,7 +687,7 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
           item={history.readState()?.packageItem}
           selectedProductId={history.readState()?.packageView?.selectedProductId}
           onBack={() => history.back()}
-          onReplace={() => { throw new Error("실제 소포장 상품 교체는 아직 지원되지 않습니다."); }}
+          onReplace={() => { handleReplacePackage}}
         />
       );
     if (
