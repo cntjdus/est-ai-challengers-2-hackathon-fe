@@ -28,3 +28,9 @@ dist-ssr
 !.env.example
 coverage
 supabase/.temp/
+
+# Python OCR runtime
+ocr_server/.venv/
+ocr_server/.local/
+__pycache__/
+.pytest_cache/

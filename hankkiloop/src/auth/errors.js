@@ -1,12 +1,15 @@
 export function authErrorMessage(error) {
   const code = error?.code || ''
   const message = error?.message || ''
+  if (/Session changed|Authentication required/i.test(message)) return '로그인 계정이 변경됐어요. 새로고침 후 다시 시도해주세요.'
   if (code === 'access_denied' || /access_denied/i.test(message)) return 'Google 로그인이 취소되었습니다. 다시 시도해주세요.'
+  if (['PGRST202', '42883'].includes(code)) return '마이페이지 저장 함수가 준비되지 않았어요. 관리자에게 MYPAGE_SETUP.sql 적용을 요청해주세요.'
   if (['PGRST204', '42703'].includes(code)) return '계정 설정을 저장할 준비가 아직 완료되지 않았어요. 관리자에게 문의해주세요.'
   if (code === '42501' || /row-level security/i.test(message)) return '계정 정보를 저장할 권한을 확인하지 못했어요. 관리자에게 문의해주세요.'
+  if (code === '22023') return '입력한 닉네임과 식단 태그를 다시 확인해주세요.'
   if (/fetch|network|timeout/i.test(message)) return '연결이 원활하지 않아요. 인터넷 연결을 확인하고 다시 시도해주세요.'
   if (/provider|not enabled/i.test(message)) return 'Google 로그인 연결을 준비 중이에요. 잠시 후 다시 시도해주세요.'
-  if (/닉네임|요리 횟수|식단 태그/.test(message)) return message
+  if (/닉네임|요리 횟수|식단 태그|알림 설정/.test(message)) return message
   return '로그인 또는 계정 정보 처리에 실패했어요. 다시 시도해주세요.'
 }
 

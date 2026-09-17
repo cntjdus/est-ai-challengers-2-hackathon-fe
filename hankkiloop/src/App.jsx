@@ -169,15 +169,15 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
   }
   const handleSaveSettings = async (draft) => {
     const saved = await onSaveProfile({ nickname, preferences: draft.preferences, alerts: draft.alerts })
+    setAccount(saved.account)
+    setNickname(saved.nickname)
     setPreferences(saved.preferences)
     setAlerts(saved.alerts)
+    return saved
   }
-  const handleEditProfile = (profile) => {
-    setAccount(profile.account)
-    setNickname(profile.nickname)
-    setPreferences(profile.preferences)
-    setAlerts(profile.alerts)
-    history.replaceState(profile, '', '/mypage')
+  const handleEditProfile = () => {
+    const profile = { account, nickname, preferences, alerts }
+    history.replaceState({ ...history.readState(), ...profile }, '', '/mypage')
     history.pushState({ ...profile, fromMyPage: true }, '', '/mypage/edit')
     setScreen('edit')
   }
@@ -193,8 +193,10 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
     setAccount(saved.account)
     setNickname(saved.nickname)
     setPreferences(saved.preferences)
+    setAlerts(saved.alerts)
     history.replaceState({}, '', '/mypage')
     setScreen('mypage')
+    return saved
   }
   useEffect(() => {
     const handlePopState = () => {
@@ -280,8 +282,8 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
   }
   return <NotificationContext.Provider value={{ open: openNotifications, isOpen: isNotificationOpen, unreadCount: notifications.filter((item) => !item.isRead).length }}>
     {userState.error && <div role="alert" className="fixed inset-x-4 top-2 z-[100] mx-auto max-w-sm rounded-xl border bg-white p-3 shadow-lg">{userState.error}<button type="button" className="ml-2 underline" onClick={userState.reload}>다시 불러오기</button></div>}
-    {inventoryLoading ? <div role="status" className="mx-auto max-w-app p-10 text-center">냉장고 정보를 불러오는 중…</div> : inventoryError && !inventoryReady ? <div role="alert" className="mx-auto max-w-app p-8"><p>{inventoryError}</p><button type="button" onClick={() => reloadInventory().catch(() => {})} className="mt-4 rounded-xl bg-[#006c49] px-5 py-3 text-white">다시 불러오기</button></div> : renderScreen()}
-    {inventoryError && inventoryReady && <div role="alert" className="fixed inset-x-4 bottom-20 z-50 mx-auto max-w-sm rounded-xl border bg-white p-4 shadow-lg"><p>{inventoryError}</p><button type="button" onClick={() => reloadInventory().catch(() => {})}>다시 불러오기</button></div>}
+    {['mypage', 'edit'].includes(screen) ? renderScreen() : inventoryLoading ? <div role="status" className="mx-auto max-w-app p-10 text-center">냉장고 정보를 불러오는 중…</div> : inventoryError && !inventoryReady ? <div role="alert" className="mx-auto max-w-app p-8"><p>{inventoryError}</p><button type="button" onClick={() => reloadInventory().catch(() => {})} className="mt-4 rounded-xl bg-[#006c49] px-5 py-3 text-white">다시 불러오기</button></div> : renderScreen()}
+    {!['mypage', 'edit'].includes(screen) && inventoryError && inventoryReady && <div role="alert" className="fixed inset-x-4 bottom-20 z-50 mx-auto max-w-sm rounded-xl border bg-white p-4 shadow-lg"><p>{inventoryError}</p><button type="button" onClick={() => reloadInventory().catch(() => {})}>다시 불러오기</button></div>}
     {isNotificationOpen && <NotificationDrawer loading={userState.loading} error={userState.error} onRetry={userState.reload} notifications={notifications} onClose={closeNotifications} onRead={handleMarkRead} onMarkAllRead={handleMarkAllRead} onAction={handleNotificationAction} />}
   </NotificationContext.Provider>
 }
