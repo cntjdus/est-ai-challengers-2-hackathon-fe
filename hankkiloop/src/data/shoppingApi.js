@@ -1,9 +1,9 @@
 import { compareIngredient } from './recipeApi'
 const labels = { ea: '개', g: 'g', ml: 'ml' }
-export function shoppingPayload(recipe, servings, inventory) {
-  return recipe.ingredients.filter(i => !i.optional).map(i => {
+export function shoppingPayload(recipe, servings, inventory, ingredientId) {
+  return recipe.ingredients.filter(i => ingredientId ? i.id === ingredientId : !i.optional).map(i => {
     const c = compareIngredient(i, servings, recipe.servings, inventory)
-    return { food_id: i.foodId, unit: i.dbUnit, required_quantity: c.required, available_quantity: c.available }
+    return { food_id: i.foodId, unit: i.dbUnit, required_quantity: c.required, available_quantity: c.available, ...(ingredientId ? { purchase_quantity: c.shortage > 0 ? c.shortage : c.required } : {}) }
   })
 }
 export function mapShoppingRows(rows) {
@@ -24,12 +24,16 @@ export async function loadShopping(client, userId) {
   if (error) throw error
   return mapShoppingRows(data ?? [])
 }
-export async function addRecipeShopping(client, recipe, servings, inventory, requestId) {
-  const { error } = await client.rpc('hk_add_recipe_shopping', {
+export async function addRecipeShopping(client, recipe, servings, inventory, requestId, ingredientId) {
+  const { error } = await client.rpc(ingredientId ? 'hk_add_recipe_ingredient_shopping' : 'hk_add_recipe_shopping', {
     p_id: requestId, p_recipe: recipe.id, p_servings: servings,
-    p_items: shoppingPayload(recipe, servings, inventory),
+    p_items: shoppingPayload(recipe, servings, inventory, ingredientId),
   })
-  if (error) throw error
+  if (error) {
+    if (ingredientId && ['PGRST202', '42883'].includes(error.code))
+      throw new Error('개별 재료 담기 DB 업데이트가 필요합니다. 관리자에게 장보기 마이그레이션 적용을 요청해주세요.')
+    throw error
+  }
 }
 export async function saveShoppingChanges(client, previous, next) {
   const changes = previous.flatMap(item => {

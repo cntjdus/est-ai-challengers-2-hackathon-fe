@@ -5,7 +5,7 @@ import BottomNavigation from '../components/common/BottomNavigation'
 import Checkbox from '../components/common/Checkbox'
 import CartItemCard from '../components/cart/CartItemCard'
 
-export default function Cart({ items, onItemsChange, onStartRegistration, registrationMessage, onNavigate, onBack, loading = false, error = '', onRetry }) {
+export default function Cart({ items, onItemsChange, onStartRegistration, registrationMessage, onNavigate, onBack, loading = false, error = '', onRetry, embedded = false, onBrowseRecipes }) {
   const [notice, setNotice] = useState(registrationMessage ?? '')
   const [saving, setSaving] = useState(false)
   const lock = useRef(false)
@@ -31,8 +31,17 @@ export default function Cart({ items, onItemsChange, onStartRegistration, regist
     if (!selectedCount || loading || error || saving) return
     onStartRegistration(selected)
   }
-  return <div className="mx-auto flex h-dvh w-full max-w-app flex-col overflow-hidden bg-[#fafcf9] text-[#161c25]">
-    <HomeHeader pageLabel="장보기" onProfile={() => onNavigate('/mypage')} onNotifications={() => setNotice('새로운 알림이 없습니다.')} />
+  return <div className={`mx-auto flex ${embedded ? "h-full" : "h-dvh"} w-full max-w-app flex-col overflow-hidden bg-[#fafcf9] text-[#161c25]`}>
+    <HomeHeader
+      pageLabel="장보기"
+      onProfile={() => onNavigate('/mypage')}
+      onNotifications={() => setNotice('새로운 알림이 없습니다.')}
+      action={embedded ? <button
+        type="button"
+        onClick={() => onNavigate('/shopping')}
+        className="min-h-10 py-2 text-sm text-[#161c25] underline underline-offset-4"
+      >장보기 →</button> : undefined}
+    />
     <header className="flex h-16 shrink-0 items-center gap-2 border-b border-[#edf1ef] px-4"><button type="button" onClick={onBack} aria-label="뒤로가기" className="flex size-9 items-center justify-center rounded-full"><ArrowLeft aria-hidden="true" className="size-6" /></button><h1 className="text-xl">장바구니</h1><span aria-label="장바구니 품목 수" className="flex size-6 items-center justify-center rounded-full bg-[#e2efe9] text-sm font-semibold text-[#006c49]">{items.length}</span><button type="button" disabled={!selectedCount || loading || saving || !!error} onClick={handleDeleteSelected} className="ml-auto py-2 text-xs text-[#596a60] disabled:opacity-40">선택 삭제</button></header>
     <main aria-label="장바구니 상품" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-3 pb-20">
       {loading && <p role="status">장바구니를 불러오는 중…</p>}
@@ -42,9 +51,9 @@ export default function Cart({ items, onItemsChange, onStartRegistration, regist
       {notice && <p role="status" className="mb-3 rounded-xl bg-[#e2efe9] p-3 text-xs text-[#006c49]">{notice}</p>}
       <div className="mb-4 flex items-center gap-2"><Checkbox label="장바구니 전체 선택" checked={allSelected} mixed={selectedCount > 0 && !allSelected} disabled={!items.length} onChange={handleToggleAll} /><span className="text-sm font-bold">전체 선택 ({selectedCount}/{items.length})</span></div>
       <div className="space-y-4">{items.map((item) => <CartItemCard key={item.id} item={item} onOpen={() => { if (!loading && !saving && !error) onStartRegistration([item]) }} onToggle={handleToggleItem} onRemove={handleRemoveItem} onQuantityChange={handleQuantityChange} />)}</div>
-      {!loading && !error && !items.length && <div className="py-14 text-center text-sm text-[#7c8595]"><p>장바구니가 비어 있어요.</p><button onClick={() => onNavigate('/recipe')} className="mt-3 underline">레시피에서 부족한 재료 담기</button></div>}
+      {!loading && !error && !items.length && <div className="py-14 text-center text-sm text-[#7c8595]"><p>장바구니가 비어 있어요.</p><button onClick={onBrowseRecipes ?? (() => onNavigate('/recipe'))} className="mt-3 underline">레시피에서 부족한 재료 담기</button></div>}
     </main>
     <section aria-label="장보기 완료" className="shrink-0 bg-white px-5 pt-3 pb-3"><div className="flex items-center gap-3"><div className="shrink-0"><p className="text-[11px] text-[#596a60]">선택 품목</p><p className="mt-1 text-xs"><strong className="mr-1 text-2xl">{selectedCount}</strong>개 담김</p></div><button type="button" disabled={!selectedCount || loading || saving || !!error} onClick={handleCompleteShopping} className="ml-auto flex min-h-13 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-[#006c49] px-2 py-2 text-xs font-bold text-white disabled:opacity-40"><ListChecks aria-hidden="true" className="size-4 shrink-0" />장보기 완료하고 냉장고 등록</button></div><p className="mt-2 flex items-start justify-center gap-1 text-[10px] font-semibold leading-4 text-[#596a60]"><ShieldCheck aria-hidden="true" className="size-3.5 shrink-0 text-[#006c49]" />다음 화면에서 실제 구매량·소비기한·보관장소를 확인한 뒤 등록합니다</p></section>
-    <BottomNavigation onNavigate={onNavigate} />
+    {!embedded && <BottomNavigation onNavigate={onNavigate} />}
   </div>
 }
