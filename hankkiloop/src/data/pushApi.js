@@ -37,7 +37,7 @@ export async function enablePush(client, userId, publicKey = import.meta.env.VIT
     else { await subscription.unsubscribe(); throw new Error('계정이 변경됐어요. 다시 설정해주세요.') }
   } catch (error) { await subscription.unsubscribe(); throw error }
 }
-export async function disablePush(client, userId) {
+export async function disablePush(client, userId, { allowRemoteFailure = false } = {}) {
   bindingGeneration++
   if (!pushSupported()) return
   const registration = await navigator.serviceWorker.getRegistration('/')
@@ -49,8 +49,14 @@ export async function disablePush(client, userId) {
   if (!subscription) return
   // Stop delivery locally even if the database is temporarily unreachable.
   await subscription.unsubscribe()
-  const { error } = await client.from('hk_push_subscriptions').delete().eq('user_id', userId).eq('endpoint', subscription.endpoint)
-  if (error) throw error
+  // Local binding has been cleared and the browser subscription stopped above.
+  try {
+    const { error } = await client.from('hk_push_subscriptions').delete().eq('user_id', userId).eq('endpoint', subscription.endpoint)
+    if (error) throw error
+  } catch (error) {
+    if (!allowRemoteFailure) throw error
+    console.warn('Remote push cleanup failed; local notifications are disabled.')
+  }
 }
 export async function isPushEnabled(client, userId) {
   const generation = ++bindingGeneration

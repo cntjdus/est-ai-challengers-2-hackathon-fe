@@ -1,8 +1,7 @@
 import { isValidNickname } from '../utils/profileValidation.js'
+import { blankPreferences, normalizeTags } from '../utils/preferenceDraft.js'
 
-export const emptyPreferences = {
-  householdType: 'single', cookingFrequency: '3-4', dietStyles: [], excludedIngredients: [], allergies: [],
-}
+export const emptyPreferences = blankPreferences
 
 export function frequencyFromCount(count) {
   if (count === 0) return '0'
@@ -11,10 +10,15 @@ export function frequencyFromCount(count) {
   return '5+'
 }
 
+function avatarUrl(value) {
+  try { const url = new URL(value); return url.protocol === 'https:' ? url.href : '' }
+  catch { return '' }
+}
+
 export function mapAccount(user, profile, preferences) {
   const name = user.user_metadata?.full_name || user.user_metadata?.name || ''
   return {
-    account: { id: user.id, name, email: user.email || '', nickname: name.slice(0, 2) || '회원' },
+    account: { id: user.id, name, email: user.email || '', nickname: name.slice(0, 2) || '회원', avatarUrl: avatarUrl(profile.avatar_url || user.user_metadata?.avatar_url || user.user_metadata?.picture) },
     nickname: profile.display_name || '',
     onboardingCompleted: Boolean(profile.onboarding_completed_at),
     preferences: {
@@ -24,38 +28,27 @@ export function mapAccount(user, profile, preferences) {
       excludedIngredients: preferences?.excluded_ingredients || [],
       allergies: preferences?.allergies || [],
     },
-    alerts: {
-      expirationAlert: preferences?.expiry_alert_enabled ?? false,
-      recipeSuggestionAlert: preferences?.recipe_suggestion_enabled ?? false,
-    },
+    alerts: { expirationAlert: preferences?.expiry_alert_enabled ?? false, recipeSuggestionAlert: preferences?.recipe_suggestion_enabled ?? false },
   }
 }
 
 export function preferencePayload(userId, preferences, alerts) {
-  if (!['0', '1-2', '3-4', '5+'].includes(preferences.cookingFrequency)) throw new Error('요리 횟수를 선택해주세요.')
-  const normalizeTags = (tags) => {
-    if (!Array.isArray(tags) || tags.length > 50 || tags.some((tag) => typeof tag !== 'string' || tag.trim().length > 50)) {
-      throw new Error('식단 태그는 각 50자 이내, 최대 50개까지 입력해주세요.')
-    }
-    return [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))]
-  }
+  if (!['0', '1-2', '3-4', '5+'].includes(preferences?.cookingFrequency)) throw new Error('요리 횟수를 선택해주세요.')
+  if (typeof alerts?.expirationAlert !== 'boolean' || typeof alerts?.recipeSuggestionAlert !== 'boolean') throw new Error('알림 설정을 다시 확인해주세요.')
   return {
-    user_id: userId,
-    cooking_frequency: preferences.cookingFrequency,
+    user_id: userId, cooking_frequency: preferences.cookingFrequency,
     preferred_tastes: normalizeTags(preferences.dietStyles),
     excluded_ingredients: normalizeTags(preferences.excludedIngredients),
     ...(preferences.allergies === undefined ? {} : { allergies: normalizeTags(preferences.allergies) }),
-    expiry_alert_enabled: Boolean(alerts.expirationAlert),
-    recipe_suggestion_enabled: Boolean(alerts.recipeSuggestionAlert),
+    expiry_alert_enabled: alerts.expirationAlert, recipe_suggestion_enabled: alerts.recipeSuggestionAlert,
   }
 }
 
-// RLS uses the signed-in JWT. Never use a service-role key in this client.
+// Only use the authenticated client: never a service-role key in the browser.
 export async function loadAccount(client, user) {
   let { data: profile, error } = await client.from('profiles').select('*').eq('id', user.id).maybeSingle()
   if (error) throw error
   if (!profile) {
-    // Cooperates with an existing auth.users trigger; a concurrent insert does not overwrite its row.
     const { error: insertError } = await client.from('profiles').upsert({ id: user.id, display_name: '' }, { onConflict: 'id', ignoreDuplicates: true })
     if (insertError) throw insertError
     const result = await client.from('profiles').select('*').eq('id', user.id).single()
@@ -68,16 +61,16 @@ export async function loadAccount(client, user) {
 }
 
 export async function saveAccount(client, user, draft, completeOnboarding = false) {
-  const nickname = draft.nickname.trim()
-  if (!isValidNickname(nickname)) throw new Error('닉네임은 한글, 영문, 숫자 2~12자로 입력해주세요.')
-  const payload = preferencePayload(user.id, draft.preferences, draft.alerts)
-  // Write preferences first. A failed request must not mark onboarding as complete.
-  // Omitted fields (allergies, exact cooking count, alert lead days) are not overwritten on conflict.
-  const { error: preferencesError } = await client.from('user_preferences').upsert(payload, { onConflict: 'user_id' })
-  if (preferencesError) throw preferencesError
-  const profileUpdate = { display_name: nickname }
-  if (completeOnboarding) profileUpdate.onboarding_completed_at = new Date().toISOString()
-  const { error } = await client.from('profiles').update(profileUpdate).eq('id', user.id).select('id').single()
+  if (!user?.id) throw new Error('Session changed')
+  if (!isValidNickname(draft?.nickname)) throw new Error('닉네임은 한글, 영문, 숫자 2~12자로 입력해주세요.')
+  const { user_id: _userId, ...preferences } = preferencePayload(user.id, draft.preferences, draft.alerts)
+  // One transaction: profiles and preferences either both save or neither saves.
+  // Return server values directly, avoiding a second read after a successful write.
+  const { data, error } = await client.rpc('hk_save_my_profile', {
+    p_draft: { user_id: user.id, display_name: draft.nickname.trim(), preferences },
+    p_complete_onboarding: completeOnboarding,
+  })
   if (error) throw error
-  return loadAccount(client, user)
+  if (!data?.profile || data.profile.id !== user.id || data.preferences?.user_id !== user.id) throw new Error('Session changed')
+  return mapAccount(user, data.profile, data.preferences)
 }

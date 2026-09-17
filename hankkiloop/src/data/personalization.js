@@ -20,14 +20,45 @@ export function recipeExclusions(recipe, preferences = {}) {
   const excluded = (preferences.excludedIngredients ?? []).filter(a => names.some(name => name.includes(normalize(a))))
   return [...allergies, ...excluded]
 }
-export function personalizeRecipes(recipes, preferences = {}, inventory = {}) {
-  const tastes = (preferences.dietStyles ?? []).map(normalize)
+// Calendar-day arithmetic avoids time-of-day and daylight-saving offsets.
+function dateDay(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? '')) return null
+  const time = Date.parse(value + 'T00:00:00Z')
+  return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value ? time / 86400000 : null
+}
+export function personalizeRecipes(recipes, preferences = {}, inventory = {}, registrations = [], now = new Date()) {
+  const tastes = [...new Set((preferences.dietStyles ?? []).map(normalize).filter(Boolean))]
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86400000
+  const usableInventory = { ...inventory }
+  const lots = registrations.map(lot => {
+    const day = dateDay(lot.expiryDate)
+    const days = day === null ? null : day - today
+    const quantity = Math.max(0, Number(lot.purchaseAmount) || 0)
+    if (days !== null && days < 0)
+      usableInventory[lot.ingredientId] = Math.max(0, (usableInventory[lot.ingredientId] ?? 0) - quantity)
+    return { ...lot, quantity, day, days, urgency: days === null || days < 0 || days > 7 ? 0 : days <= 1 ? 1 : days <= 3 ? 0.7 : 0.3 }
+  }).filter(lot => lot.quantity > 0 && (lot.days === null || lot.days >= 0))
+    .sort((a, b) => (a.day ?? Infinity) - (b.day ?? Infinity))
+  const totalUrgency = lots.reduce((sum, lot) => sum + lot.urgency, 0)
   return recipes.filter(r => !recipeExclusions(r, preferences).length).map(recipe => {
     const needed = recipe.ingredients.filter(i => !i.optional)
-    const available = needed.filter(i => (inventory[i.id] ?? 0) >= i.quantity).length
-    const text = normalize(recipe.title + recipe.tag + recipe.description)
-    const tasteScore = tastes.filter(t => text.includes(t) || (t.includes('초간단') && recipe.minutes <= 20)).length
-    return { ...recipe, recommendationScore: available / Math.max(needed.length, 1) * 10 + tasteScore * 2,
+    const available = needed.filter(i => (usableInventory[i.id] ?? 0) >= i.quantity).length
+    const stockRatio = needed.reduce((sum, i) => sum + (i.quantity > 0 ? Math.min(1, Math.max(0, usableInventory[i.id] ?? 0) / i.quantity) : 0), 0) / Math.max(needed.length, 1)
+    const remaining = new Map()
+    for (const i of recipe.ingredients) remaining.set(i.id, (remaining.get(i.id) ?? 0) + Math.max(0, Number(i.quantity) || 0))
+    let usedUrgency = 0
+    for (const lot of lots) {
+      const used = Math.min(lot.quantity, remaining.get(lot.ingredientId) ?? 0)
+      remaining.set(lot.ingredientId, (remaining.get(lot.ingredientId) ?? 0) - used)
+      usedUrgency += lot.urgency * used / lot.quantity
+    }
+    const urgencyRatio = totalUrgency ? usedUrgency / totalUrgency : 0
+    const text = normalize([recipe.title, recipe.tag, recipe.description].filter(Boolean).join(' '))
+    const tasteRatio = tastes.filter(t => text.includes(t) || (t.includes('초간단') && Number(recipe.minutes) > 0 && Number(recipe.minutes) <= 20)).length / Math.max(tastes.length, 1)
+    // Missing criteria are omitted and the remaining weights are normalized.
+    const weight = (totalUrgency > 0 ? 0.5 : 0) + (needed.length ? 0.4 : 0) + (tastes.length ? 0.1 : 0)
+    const score = weight ? 100 * (urgencyRatio * 0.5 + stockRatio * 0.4 + tasteRatio * 0.1) / weight : 0
+    return { ...recipe, recommendationScore: score,
       benefit: '기본 ' + recipe.servings + '인분 기준 재료 ' + available + '/' + needed.length + '개 보유' }
   }).sort((a, b) => b.recommendationScore - a.recommendationScore)
 }

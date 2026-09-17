@@ -6,6 +6,7 @@ import OnboardingPage from '../pages/OnboardingPage'
 import PreferenceSetupPage from '../pages/PreferenceSetupPage'
 import { supabase } from '../lib/supabase'
 import { loadAccount, saveAccount } from './profile'
+import { signOutAccount } from './signOut'
 import { authErrorMessage, readCallbackError } from './errors'
 import { navigateAuth, rememberReturnPath, takeReturnPath } from './navigation'
 
@@ -136,9 +137,7 @@ export default function AuthGate() {
 
   const signOut = async () => {
     if (!supabase) return
-    await disablePush(supabase, session?.user.id)
-    const { error: failure } = await supabase.auth.signOut({ scope: 'local' })
-    if (failure) throw failure
+    await signOutAccount(supabase, session?.user.id, disablePush)
     liveUserId.current = null
     setProfile(null)
     setSession(null)
@@ -148,7 +147,8 @@ export default function AuthGate() {
   }
 
   const saveProfile = async (draft, completeOnboarding = false) => {
-    const user = session.user
+    const user = session?.user
+    if (!user || liveUserId.current !== user.id) throw new Error('Session changed')
     const result = await saveAccount(supabase, user, draft, completeOnboarding)
     if (liveUserId.current !== user.id) throw new Error('Session changed')
     setProfile(result)

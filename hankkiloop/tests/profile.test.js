@@ -52,11 +52,12 @@ describe('account persistence', () => {
     expect((await loadAccount(client, user)).nickname).toBe('트리거닉네임')
     expect(insert.upsert).toHaveBeenCalledWith({ id: user.id, display_name: '' }, { onConflict: 'id', ignoreDuplicates: true })
   })
-  it('does not mark onboarding complete when preferences fail', async () => {
-    const client = { from: vi.fn(() => resultChain({ error: { code: '42501' } })) }
+  it('does not mark onboarding complete when atomic profile save fails', async () => {
+    const client = { rpc: vi.fn().mockResolvedValue({ data: null, error: { code: '42501' } }), from: vi.fn() }
     await expect(saveAccount(client, user, { nickname: '성한', preferences, alerts }, true)).rejects.toEqual({ code: '42501' })
-    expect(client.from).toHaveBeenCalledTimes(1)
-    expect(client.from).toHaveBeenCalledWith('user_preferences')
+    expect(client.rpc).toHaveBeenCalledTimes(1)
+    expect(client.rpc).toHaveBeenCalledWith('hk_save_my_profile', expect.objectContaining({ p_complete_onboarding: true }))
+    expect(client.from).not.toHaveBeenCalled()
   })
 })
 

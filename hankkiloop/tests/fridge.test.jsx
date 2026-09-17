@@ -37,7 +37,19 @@ describe('DB inventory', () => {
     expect(chain.eq).toHaveBeenCalledWith('user_id','owner')
   })
   it('round-trips allergies separately from excluded ingredients', () => {
-    const payload = preferencePayload('u',{cookingFrequency:'3-4',dietStyles:[],excludedIngredients:['오이'],allergies:['땅콩','땅콩']},{})
+    const payload = preferencePayload(
+      'u',
+    {
+      cookingFrequency: '3-4',
+      dietStyles: [],
+      excludedIngredients: ['오이'],
+      allergies: ['땅콩', '땅콩'],
+    },
+  {
+    expirationAlert: false,
+    recipeSuggestionAlert: false,
+  },
+)
     expect(payload.allergies).toEqual(['땅콩'])
     expect(mapAccount({id:'u'}, {}, payload).preferences.allergies).toEqual(['땅콩'])
   })
