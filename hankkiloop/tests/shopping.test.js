@@ -1,10 +1,24 @@
 import { expect, it, vi } from 'vitest'
-import { shoppingPayload, mapShoppingRows, saveShoppingChanges, loadShopping, checkoutShopping } from '../src/data/shoppingApi'
+import { shoppingPayload, mapShoppingRows, saveShoppingChanges, loadShopping, checkoutShopping, addRecipeShopping } from '../src/data/shoppingApi'
 import { createRegistrationDraft } from '../src/data/materialRegistration'
 import { toRegistrationPayload } from '../src/data/fridgeApi'
 import { personalizeRecipes, recipeExclusions } from '../src/data/personalization'
 const egg = { id: 'food:egg:ea', foodId: 'egg', dbUnit: 'ea', name: '달걀', quantity: 2 }
 const recipe = { id: 'r', title: '달걀 요리', servings: 1, minutes: 10, ingredients: [egg] }
+it('uses the ingredient endpoint and reports missing migrations instead of a false duplicate', async () => {
+  const client = { rpc: vi.fn().mockResolvedValue({ error: null }) }
+  await addRecipeShopping(client, recipe, 1, {}, 'request', egg.id)
+  expect(client.rpc).toHaveBeenCalledWith('hk_add_recipe_ingredient_shopping', expect.objectContaining({ p_id: 'request', p_items: [expect.objectContaining({ food_id: 'egg', purchase_quantity: 2 })] }))
+  client.rpc.mockResolvedValue({ error: { code: 'PGRST202' } })
+  await expect(addRecipeShopping(client, recipe, 1, {}, 'request', egg.id)).rejects.toThrow('DB 업데이트가 필요')
+})
+it('adds only the chosen ingredient including optional and sufficiently stocked ingredients', () => {
+  const selectedRecipe = { ...recipe, ingredients: [egg, { ...egg, id: 'optional', foodId: 'salt', optional: true }] }
+  expect(shoppingPayload(selectedRecipe, 2, { optional: 10 }, 'optional')).toEqual([
+    { food_id: 'salt', unit: 'ea', required_quantity: 4, available_quantity: 10, purchase_quantity: 4 },
+  ])
+  expect(shoppingPayload(recipe, 2, { [egg.id]: 1 }, egg.id)[0].purchase_quantity).toBe(3)
+})
 it('scales required amounts and keeps shared stock allocation available for the server', () => {
   expect(shoppingPayload(recipe, 2, { [egg.id]: 1 })).toEqual([{ food_id: 'egg', unit: 'ea', required_quantity: 4, available_quantity: 1 }])
   expect(shoppingPayload({ ...recipe, ingredients: [{ ...egg, optional: true }] }, 1, {})).toEqual([])

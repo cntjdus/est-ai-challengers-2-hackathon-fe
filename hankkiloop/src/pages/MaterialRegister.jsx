@@ -7,8 +7,8 @@ import PhotoRecognitionSection from '../components/register/PhotoRecognitionSect
 import character from '../assets/hankkiloop-character.png'
 import { createDirectRegistrationDraft, createRegistrationDraft, solutionOptions, storageGuides, validateMaterial } from '../data/materialRegistration'
 
-export default function MaterialRegister({ items, source, onNavigate, onBack, onRegister, onOpenPackageSolution, allowPackageOptions = false }) {
-  const [materials, setMaterials] = useState(() => ((history.state?.registrationDraft?.every(draft => source === 'fridge-direct' || items.some(item => item.id === draft.shoppingItemId)) ? history.state.registrationDraft : null) ?? (source === 'fridge-direct' ? createDirectRegistrationDraft() : createRegistrationDraft(items))).map((item) => ({ ...item, recognizedFromPhoto: false, expiryDate: item.expiryAutomatic ? '' : item.expiryDate, expiryAutomatic: false })))
+export default function MaterialRegister({ items, source, onNavigate, onBack, onRegister, onOpenPackageSolution, allowPackageOptions = false, embedded = false }) {
+  const [materials, setMaterials] = useState(() => ((!embedded && history.state?.registrationDraft?.every(draft => source === 'fridge-direct' || items.some(item => item.id === draft.shoppingItemId)) ? history.state.registrationDraft : null) ?? (source === 'fridge-direct' ? createDirectRegistrationDraft() : createRegistrationDraft(items))).map((item) => ({ ...item, recognizedFromPhoto: false, expiryDate: item.expiryAutomatic ? '' : item.expiryDate, expiryAutomatic: false })))
   const [mode, setMode] = useState('manual')
   const [solution, setSolution] = useState('freeze')
   const [activeIndex, setActiveIndex] = useState(0)
@@ -19,7 +19,7 @@ export default function MaterialRegister({ items, source, onNavigate, onBack, on
   const formRef = useRef(null)
   const material = materials[activeIndex]
   const recognizedIngredients = materials.filter((item) => item.recognizedFromPhoto)
-  useEffect(() => { history.replaceState({ ...history.state, registrationDraft: materials }, '', location.href) }, [materials])
+  useEffect(() => { if (!embedded) history.replaceState({ ...history.state, registrationDraft: materials }, '', location.href) }, [materials, embedded])
   const handleMaterialChange = (changes) => {
     setError('')
     setMaterials((current) => current.map((item, index) => {
@@ -49,7 +49,7 @@ export default function MaterialRegister({ items, source, onNavigate, onBack, on
       await onRegister(materials)
     } catch (failure) { submitted.current = false; setError(failure.message) } finally { setSaving(false) }
   }
-  return <div className="mx-auto flex h-dvh w-full max-w-app flex-col overflow-hidden bg-[#fafcf9] text-[#1e293b]">
+  return <div className={`mx-auto flex ${embedded ? "h-full" : "h-dvh"} w-full max-w-app flex-col overflow-hidden bg-[#fafcf9] text-[#1e293b]`}>
     <EditProfileHeader title="재료 등록" plain onBack={onBack} action={<button type="button" aria-label="재료 등록 닫기" onClick={() => onNavigate(source === 'fridge-direct' ? '/fridge' : '/shopping')} className="flex size-9 items-center justify-center rounded-full"><X aria-hidden="true" className="size-5" /></button>} />
     <main aria-label="재료 등록" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-10 pb-6">
       {!material ? <div className="py-12 text-center"><p className="text-sm">등록할 재료가 없습니다.</p><button type="button" onClick={() => onNavigate(source === 'fridge-direct' ? '/fridge' : '/shopping')} className="mt-5 rounded-xl bg-[#006c49] px-5 py-3 text-sm text-white">장바구니로 돌아가기</button></div> : <>
@@ -64,6 +64,6 @@ export default function MaterialRegister({ items, source, onNavigate, onBack, on
         {materials.length > 1 && <p className="mt-2 text-center text-[10px] text-[#7c8595]">선택한 {materials.length}개 재료를 함께 등록합니다.</p>}
       </>}
     </main>
-    <BottomNavigation onNavigate={onNavigate} />
+    {!embedded && <BottomNavigation onNavigate={onNavigate} />}
   </div>
 }
