@@ -62,7 +62,7 @@ export default function MyPage({ account, nickname, initialPreferences, initialA
           {!dirty && notice && <p role="status" className="text-sm text-[#006c49]">{notice}</p>}
           <PushSettings userId={account.id} />
           {unitSettings}
-          <button type="button" disabled={busy} onClick={signOut} className="min-h-11 rounded-xl border border-[#cbd5e1] px-4 py-3 text-sm text-[#64748b]">로그아웃</button>
+          <button type="button" disabled={busy} onClick={signOut} className="min-h-11 rounded-xl border border-[#e2e8f0] bg-white px-4 py-3 text-sm text-[#64748b] shadow-xs disabled:opacity-50">로그아웃</button>
         </div>
       </main>
       <BottomNavigation onNavigate={navigate} />

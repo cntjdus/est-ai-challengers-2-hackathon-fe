@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { enablePush, disablePush, isPushEnabled, pushSupported } from '../../data/pushApi'
+import bell from '../../assets/icons/smart-care-bell.svg'
 
 export default function PushSettings({ userId }) {
   const [enabled, setEnabled] = useState(false)
@@ -22,5 +23,14 @@ export default function PushSettings({ userId }) {
     } catch (e) { setMessage(e.message) }
     finally { locked.current = false; setBusy(false) }
   }
-  return <section className="space-y-2 rounded-2xl bg-white p-4"><h2 className="font-semibold">이 기기 푸시 알림</h2><p className="text-xs text-slate-600">앱을 닫아도 켜 둔 종류의 알림을 받아요. 로그아웃하면 이 기기의 수신이 해제됩니다.</p><button type="button" disabled={busy || !pushSupported()} onClick={toggle} className="rounded border px-3 py-2 text-sm disabled:opacity-40">{busy ? '설정 중…' : enabled ? '푸시 끄기' : '푸시 켜기'}</button>{!pushSupported() && <p className="text-xs">HTTPS에서 지원되는 브라우저로 열어주세요. iPhone은 홈 화면에 추가해야 해요.</p>}{message && <p role="status" className="text-xs">{message}</p>}</section>
+  return <section aria-labelledby="device-push-heading" className="space-y-3 rounded-2xl border border-[#e2e8f0]/80 bg-white p-[17px] shadow-xs">
+    <h2 id="device-push-heading" className="flex items-center gap-2 text-[17px] leading-6 text-[#161c25]"><img src={bell} alt="" className="size-[16.7px]" />기기 및 알림 설정</h2>
+    <div className="flex items-center justify-between gap-3 border-t border-[#f1f5f9] pt-3">
+      <div className="min-w-0"><h3 className="text-sm leading-5 text-[#161c25]">이 기기 푸시 알림</h3><p className="mt-0.5 text-[11px] leading-4 text-[#3c4a42]">앱을 닫아도 켜 둔 종류의 알림을 받아요.</p></div>
+      <button type="button" disabled={busy || !pushSupported()} onClick={toggle} className="min-h-11 shrink-0 rounded-xl border border-[#b8ded0] bg-[#ecfdf5] px-3 text-xs font-semibold text-[#006c49] disabled:opacity-40">{busy ? '설정 중…' : enabled ? '푸시 끄기' : '푸시 켜기'}</button>
+    </div>
+    <p className="text-[11px] leading-4 text-[#64748b]">로그아웃하면 이 기기의 수신이 해제됩니다.</p>
+    {!pushSupported() && <p className="rounded-xl bg-[#fff8ee] px-3 py-2 text-[11px] leading-4 text-[#8c5b21]">HTTPS에서 지원되는 브라우저로 열어주세요. iPhone은 홈 화면에 추가해야 해요.</p>}
+    {message && <p role="status" className="rounded-xl bg-[#f1f5f9] px-3 py-2 text-[11px] leading-4 text-[#64748b]">{message}</p>}
+  </section>
 }
