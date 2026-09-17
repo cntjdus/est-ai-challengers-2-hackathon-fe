@@ -54,14 +54,14 @@ export default function MyPage({ account, nickname, initialPreferences, initialA
             <AvoidIngredientsSection {...form.avoidProps} />
             <AvoidIngredientsSection {...form.allergyProps} />
             <SmartCareCard expirationAlert={alerts.expirationAlert} onExpirationChange={value => setAlerts(previous => ({ ...previous, expirationAlert: value }))} recipeSuggestionAlert={alerts.recipeSuggestionAlert} onRecipeChange={value => setAlerts(previous => ({ ...previous, recipeSuggestionAlert: value }))} />
-            <p className="text-xs leading-5 text-[#64748b]">식생활과 알림 변경사항은 아래 버튼을 눌러 저장해주세요. 입력 중인 재료도 함께 저장됩니다.</p>
-            <button type="button" disabled={busy} onClick={save} className="min-h-12 w-full rounded-xl bg-[#006c49] px-4 py-3 text-sm text-white disabled:opacity-50">{busy ? '처리 중…' : '설정 저장'}</button>
           </fieldset>
+          <PushSettings userId={account.id} />
+          {unitSettings}
+          <p className="text-xs leading-5 text-[#64748b]">식생활과 알림 변경사항은 아래 버튼을 눌러 저장해주세요. 입력 중인 재료도 함께 저장됩니다.</p>
+          <button type="button" disabled={busy} onClick={save} className="min-h-12 w-full rounded-xl bg-[#006c49] px-4 py-3 text-sm text-white disabled:opacity-50">{busy ? '처리 중…' : '설정 저장'}</button>
           {(error || form.inputError) && <p role="alert" className="text-sm text-red-700">{error || form.inputError}</p>}
           {!busy && dirty && <p role="status" className="text-xs text-[#64748b]">저장하지 않은 변경사항이 있어요.</p>}
           {!dirty && notice && <p role="status" className="text-sm text-[#006c49]">{notice}</p>}
-          <PushSettings userId={account.id} />
-          {unitSettings}
           <button type="button" disabled={busy} onClick={signOut} className="min-h-11 rounded-xl border border-[#e2e8f0] bg-white px-4 py-3 text-sm text-[#64748b] shadow-xs disabled:opacity-50">로그아웃</button>
         </div>
       </main>
