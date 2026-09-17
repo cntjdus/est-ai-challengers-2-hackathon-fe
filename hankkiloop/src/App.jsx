@@ -13,6 +13,8 @@ import IngredientDetail from "./pages/IngredientDetail";
 import Fridge from "./pages/Fridge";
 
 import MaterialRegister from "./pages/MaterialRegister";
+import PackageSolution from "./pages/PackageSolution";
+import PackageMap from "./pages/PackageMap";
 import { supabase } from "./lib/supabase";
 import {
   loadInventory,
@@ -539,6 +541,22 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
     );
     setScreen("register");
   };
+  const handleOpenPackageSolution = (item) => {
+    history.pushState(
+      { ...history.readState(), packageItem: item },
+      "",
+      "/shopping/package-solution",
+    );
+    setScreen("packageSolution");
+  };
+  const handleOpenPackageMap = (packageView) => {
+    history.pushState(
+      { ...history.readState(), packageView },
+      "",
+      "/shopping/package-solution/map",
+    );
+    setScreen("packageMap");
+  };
   const registrationRequest = useRef(null);
   const handleRegisterToFridge = async (materials, { stayOnRecipe = false } = {}) => {
     if (!materials.length) throw new Error("등록할 재료가 없습니다.");
@@ -614,14 +632,24 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
           }}
         />
       );
-    if (screen === "packageMap" || screen === "packageSolution")
+    if (screen === "packageSolution")
       return (
-        <div className="p-6">
-          <p>실제 소포장 상품·매장 데이터는 아직 준비 중입니다.</p>
-          <button onClick={() => handleMainNavigate("/shopping")}>
-            장바구니로
-          </button>
-        </div>
+        <PackageSolution
+          item={history.readState()?.packageItem}
+          onBack={() => history.back()}
+          onClose={() => history.back()}
+          onOpenMap={handleOpenPackageMap}
+          onReplace={() => { throw new Error("실제 소포장 상품 교체는 아직 지원되지 않습니다."); }}
+        />
+      );
+    if (screen === "packageMap")
+      return (
+        <PackageMap
+          item={history.readState()?.packageItem}
+          selectedProductId={history.readState()?.packageView?.selectedProductId}
+          onBack={() => history.back()}
+          onReplace={() => { throw new Error("실제 소포장 상품 교체는 아직 지원되지 않습니다."); }}
+        />
       );
     if (
       screen === "register" &&
@@ -641,7 +669,7 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
     if (screen === "register")
       return (
         <MaterialRegister
-          allowPackageOptions={false}
+          allowPackageOptions
           key={history.readState()?.registrationId ?? "empty"}
           source={history.readState()?.source}
           items={cartItems.filter((item) =>
@@ -659,6 +687,7 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
             else handleMainNavigate("/shopping");
           }}
           onRegister={handleRegisterToFridge}
+          onOpenPackageSolution={handleOpenPackageSolution}
         />
       );
     if (screen === "recipeDetail" && (recipeLoading || recipeError))

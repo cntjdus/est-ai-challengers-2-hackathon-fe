@@ -22,3 +22,15 @@ it('allows retry after a shopping lookup failure', async () => {
   fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }))
   expect(await screen.findByText('장바구니가 비어 있어요.')).toBeTruthy()
 })
+it('opens the small package finder from registration and returns to the form', async () => {
+  const item = { id: 'cart-onion', foodId: 'onion', ingredientId: 'food:onion:g', name: '대파', shortName: '대파', quantity: 1, packageAmount: 300, amountUnit: 'g', plannedUsage: 100, inventoryQuantity: 300, selected: true, dbRow: {} }
+  loadShopping.mockResolvedValueOnce([item])
+  history.replaceState({ ownerId: 'user-a', registrationId: 'registration', registrationItems: [{ id: item.id }], fromShopping: true }, '', '/shopping/register')
+  render(<App initialProfile={profile} />)
+  const option = await screen.findByRole('button', { name: /소포장 찾기/ })
+  fireEvent.click(option)
+  expect(await screen.findByRole('heading', { name: '소포장 식재료 찾기' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '뒤로가기' }))
+  expect(await screen.findByRole('heading', { name: '재료 등록' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: /소포장 찾기/ })).toBeTruthy()
+})
