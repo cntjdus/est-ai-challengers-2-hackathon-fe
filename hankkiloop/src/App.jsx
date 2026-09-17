@@ -678,7 +678,7 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
           onBack={() => history.back()}
           onClose={() => history.back()}
           onOpenMap={handleOpenPackageMap}
-          onReplace={() => { handleReplacePackage}}
+          onReplace={handleReplacePackage}
         />
       );
     if (screen === "packageMap")
@@ -687,7 +687,7 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
           item={history.readState()?.packageItem}
           selectedProductId={history.readState()?.packageView?.selectedProductId}
           onBack={() => history.back()}
-          onReplace={() => { handleReplacePackage}}
+          onReplace={handleReplacePackage}
         />
       );
     if (
@@ -757,6 +757,7 @@ export default function App({ initialProfile, onSaveProfile, onSignOut }) {
             onItemsChange: handleCartChange,
             onStartRegistration: handleStartRegistration,
             onRegister: (materials) => handleRegisterToFridge(materials, { stayOnRecipe: true }),
+            onReplacePackage: handleReplacePackage,
             onNavigate: handleMainNavigate,
           }}
           allergyNotice={allergyNotice}

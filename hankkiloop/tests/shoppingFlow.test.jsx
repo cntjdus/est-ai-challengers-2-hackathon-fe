@@ -88,3 +88,18 @@ it('opens shopping in a sheet and preserves the cooking completion sheet', async
   fireEvent.click(screen.getByRole('button', { name: '요리 완료' }))
   expect(screen.getByRole('dialog', { name: '사용한 식재료 재고 차감' })).toBeTruthy()
 })
+
+it('opens the package finder from an item in the recipe shopping sheet', async () => {
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
+  const recipe = { id: 'r', title: '감자 요리', servings: 1, ingredients: [], tools: [], steps: [] }
+  const item = { id: 'a', name: '감자', shortName: '감자', dbRow: {}, foodId: 'potato', dbUnit: 'g', quantity: 1, packageAmount: 100, amountUnit: 'g', selected: true, recipeTitles: [] }
+  render(<RecipeDetail recipes={[recipe]} recipeId="r" savedIds={[]} inventory={{}} shoppingProps={{ items: [item], onItemsChange: vi.fn(), onNavigate: vi.fn(), onReplacePackage: vi.fn() }} />)
+  fireEvent.click(screen.getByRole('button', { name: '장보러 가기' }))
+  fireEvent.click(screen.getByRole('button', { name: '감자 재료 등록' }))
+  const option = screen.getByRole('button', { name: /소포장 찾기/ })
+  fireEvent.click(option)
+  expect(screen.getByRole('heading', { name: '소포장 식재료 찾기' })).toBeTruthy()
+  fireEvent.click(within(screen.getByRole('dialog', { name: '소포장 식재료 찾기' })).getByRole('button', { name: '뒤로가기' }))
+  expect(screen.getByRole('button', { name: /소포장 찾기/ })).toBeTruthy()
+})

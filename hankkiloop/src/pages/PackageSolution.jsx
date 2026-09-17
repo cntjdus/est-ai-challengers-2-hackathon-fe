@@ -51,6 +51,7 @@ export default function PackageSolution({
   onClose,
   onReplace,
   onOpenMap,
+  embedded = false,
 }) {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(Boolean(item))
@@ -221,7 +222,7 @@ export default function PackageSolution({
   }
 
   return (
-    <div className="mx-auto flex h-dvh w-full max-w-app flex-col overflow-hidden bg-white text-[#1e293b]">
+    <div className={`mx-auto flex ${embedded ? 'h-full' : 'h-dvh'} w-full max-w-app flex-col overflow-hidden bg-white text-[#1e293b]`}>
       <EditProfileHeader
         title="소포장 식재료 찾기"
         subtitle="1인 가구 음식물 쓰레기 ZERO 루프"

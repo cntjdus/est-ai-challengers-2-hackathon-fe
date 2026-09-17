@@ -1,6 +1,8 @@
 import BottomSheet from "../components/common/BottomSheet";
 import Cart from "./Cart";
 import MaterialRegister from "./MaterialRegister";
+import PackageSolution from "./PackageSolution";
+import PackageMap from "./PackageMap";
 import StockDeductionSheet from "../components/recipe/StockDeductionSheet";
 import { useRef, useState } from "react";
 import {
@@ -57,6 +59,8 @@ export default function RecipeDetail({
   const [addingShopping, setAddingShopping] = useState(null);
   const [isShoppingOpen, setIsShoppingOpen] = useState(false);
   const [registrationItems, setRegistrationItems] = useState(null);
+  const [packageItem, setPackageItem] = useState(null);
+  const [packageView, setPackageView] = useState(null);
   const [registrationSaving, setRegistrationSaving] = useState(false);
   const shoppingRequests = useRef(new Map());
   const shoppingLock = useRef(false);
@@ -405,10 +409,25 @@ export default function RecipeDetail({
         </div>
       </footer>
       {isShoppingOpen && shoppingProps && (
-        <BottomSheet label={registrationItems ? "재료 등록" : "장바구니"} initialHeight={0.82} fitVisualViewport dismissible={!registrationSaving} onClose={() => { setIsShoppingOpen(false); setRegistrationItems(null); }} contentClassName="overflow-hidden">
-          {registrationItems ? <MaterialRegister
+        <BottomSheet label={packageView ? "주변 소포장 지도" : packageItem ? "소포장 식재료 찾기" : registrationItems ? "재료 등록" : "장바구니"} initialHeight={0.82} fitVisualViewport dismissible={!registrationSaving} onClose={() => { setIsShoppingOpen(false); setRegistrationItems(null); setPackageItem(null); setPackageView(null); }} contentClassName="overflow-hidden">
+          {packageView ? <PackageMap
             embedded
+            item={packageItem}
+            selectedProductId={packageView.selectedProductId}
+            onBack={() => setPackageView(null)}
+            onReplace={shoppingProps.onReplacePackage}
+          /> : packageItem ? <PackageSolution
+            embedded
+            item={packageItem}
+            onBack={() => setPackageItem(null)}
+            onClose={() => setPackageItem(null)}
+            onOpenMap={setPackageView}
+            onReplace={shoppingProps.onReplacePackage}
+          /> : registrationItems ? <MaterialRegister
+            embedded
+            allowPackageOptions
             items={registrationItems}
+            onOpenPackageSolution={setPackageItem}
             onBack={() => { if (!registrationSaving) setRegistrationItems(null); }}
             onNavigate={() => { if (!registrationSaving) setRegistrationItems(null); }}
             onRegister={async (materials) => {

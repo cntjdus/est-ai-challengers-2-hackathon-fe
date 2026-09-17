@@ -31,6 +31,7 @@ export default function PackageMap({
   selectedProductId,
   onBack,
   onReplace,
+  embedded = false,
 }) {
   const [location] = useState(
     getCurrentLocation,
@@ -220,7 +221,7 @@ export default function PackageMap({
   }
 
   return (
-    <div className="relative mx-auto flex h-dvh w-full max-w-app flex-col overflow-hidden bg-white text-[#161c25]">
+    <div className={`relative mx-auto flex ${embedded ? 'h-full' : 'h-dvh'} w-full max-w-app flex-col overflow-hidden bg-white text-[#161c25]`}>
       <EditProfileHeader
         title="주변 소포장 지도"
         subtitle={
